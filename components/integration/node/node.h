@@ -35,6 +35,10 @@ bool node_is_sta_locked(void); // Returns whether the STA interface is enabled o
 bool node_is_ap_locked(void); // Returns whether the AP interface is enabled or not
 bool node_is_device_apsta(void); // Returns whether the device is on AP+STA mode or not
 
+// Orientation mode
+void node_set_orientation_mode_requested(bool enabled);
+bool node_is_orientation_mode_enabled(void);
+
 // Node parameters
 node_device_orientation_t node_get_device_orientation(void); // Orientation of node's specific device
 bool node_is_device_center_root(void); // Tells the device if they're center root or not

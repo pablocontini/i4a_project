@@ -12,6 +12,15 @@
 #include "remote_control.h"
 #include "node.h"
 
+/*
+ * Declaración directa para evitar dependencia circular entre
+ * node y antenna_orientation_mode.
+ *
+ * La función está implementada en:
+ * components/integration/antenna_orientation_mode/src/antenna_orientation_mode.c
+ */
+bool antenna_orientation_mode_pin_is_active(void);
+
 #define MAX_DEVICES_PER_HOUSE 5
 
 #define NODE_NAME_PREFIX "I4A"
@@ -33,6 +42,8 @@
 #define DEFAULT_MASK 0xFFFFFFFF
 
 static const char *TAG = "node";
+
+static bool s_orientation_mode_requested = false;
 
 typedef struct node {
   DevicePtr node_device_ptr;
@@ -84,13 +95,23 @@ void node_setup(void){
   ESP_ERROR_CHECK(ring_link_init());
 
   if(node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER) {
+    bool orientation_mode = antenna_orientation_mode_pin_is_active();
+
+    node_set_orientation_mode_requested(orientation_mode);
+
+    ESP_LOGI(
+      TAG,
+      "Orientation mode requested by CENTER: %d",
+      orientation_mode
+    );
+
     while (!rm_broadcast_reset()) {
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     vTaskDelay(pdMS_TO_TICKS(10000)); // Wait 10 seconds so all the devices come back up in case this was an actual node reset
 
-    while (!rm_broadcast_startup_info(config_mode_is(CONFIG_MODE_ROOT))) {
+    while (!rm_broadcast_startup_info(config_mode_is(CONFIG_MODE_ROOT), orientation_mode)) {
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
@@ -108,8 +129,12 @@ void node_setup(void){
   node_ptr->node_device_mac = rm_get_mac();
   node_ptr->node_device_uuid = rm_get_uuid();
   node_ptr->node_device_is_center_root = rm_is_root();
-  node_traffic_init();
-  im_scheduler_start();
+  if (!node_is_orientation_mode_enabled()) {
+    node_traffic_init();
+    im_scheduler_start();
+  } else {
+    ESP_LOGI(TAG, "Orientation mode active: skipping node_traffic_init and im_scheduler_start");
+  }
 }
 
 void node_set_as_sta(){
@@ -312,4 +337,14 @@ bool node_is_sta_locked(void) {
 
 bool node_is_device_apsta(void) {
   return device_is_apsta(node_ptr->node_device_ptr);
+}
+
+void node_set_orientation_mode_requested(bool enabled)
+{
+    s_orientation_mode_requested = enabled;
+}
+
+bool node_is_orientation_mode_enabled(void)
+{
+    return s_orientation_mode_requested;
 }

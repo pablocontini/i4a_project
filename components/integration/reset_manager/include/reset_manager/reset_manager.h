@@ -12,6 +12,7 @@ typedef struct {
     uint8_t opcode;
     char uuid[UUID_LENGTH];
     uint8_t is_root;
+    uint8_t orientation_mode;
 } rm_startup_packet_t;
 
 typedef struct reset_manager {
@@ -25,7 +26,7 @@ typedef struct reset_manager {
 
 void rm_init(ring_share_t *rs);
 bool rm_broadcast_reset(void);
-bool rm_broadcast_startup_info(bool is_root);
+bool rm_broadcast_startup_info(bool is_root, bool orientation_mode);
 bool rm_is_device_up(void);
 bool rm_is_root(void);
 bool rm_should_device_reset(void);
