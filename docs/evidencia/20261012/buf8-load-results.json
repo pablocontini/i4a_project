@@ -1,0 +1,174 @@
+[
+  {
+    "phase": "grillo_only",
+    "results": [
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 2315560,
+        "elapsed_s": 60.04599999997299,
+        "mbps": 0.3085048129768566,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 2820720,
+        "elapsed_s": 60.03100000001723,
+        "mbps": 0.3759017840781184,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 2476160,
+        "elapsed_s": 60.03100000001723,
+        "mbps": 0.3299841748429031,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 2534560,
+        "elapsed_s": 60.04599999997299,
+        "mbps": 0.33768244346016585,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      }
+    ],
+    "summary": [
+      {
+        "node": "grillo",
+        "connections": 4,
+        "bytes": 10147000,
+        "mbps": 1.351896879059996,
+        "errors": 0,
+        "completed_downloads": 0
+      }
+    ],
+    "timeout_s": 10.0
+  },
+  {
+    "phase": "both",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.52.0.2",
+        "ifindex": 25,
+        "bytes": 3039300,
+        "elapsed_s": 60.01600000000326,
+        "mbps": 0.40513196480936214,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "ramona",
+        "source": "10.52.0.2",
+        "ifindex": 25,
+        "bytes": 2476160,
+        "elapsed_s": 60.01600000000326,
+        "mbps": 0.3300666488936105,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "ramona",
+        "source": "10.52.0.2",
+        "ifindex": 25,
+        "bytes": 2274680,
+        "elapsed_s": 60.0,
+        "mbps": 0.3032906666666667,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "ramona",
+        "source": "10.52.0.2",
+        "ifindex": 25,
+        "bytes": 2571060,
+        "elapsed_s": 60.01600000000326,
+        "mbps": 0.3427166089042736,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 1620600,
+        "elapsed_s": 60.0,
+        "mbps": 0.21608,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 989880,
+        "elapsed_s": 60.0,
+        "mbps": 0.131984,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 719780,
+        "elapsed_s": 60.0,
+        "mbps": 0.09597066666666668,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "grillo",
+        "source": "10.116.0.2",
+        "ifindex": 6,
+        "bytes": 890105,
+        "elapsed_s": 60.0,
+        "mbps": 0.11868066666666667,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      }
+    ],
+    "summary": [
+      {
+        "node": "ramona",
+        "connections": 4,
+        "bytes": 10361200,
+        "mbps": 1.3811250333243719,
+        "errors": 0,
+        "completed_downloads": 0
+      },
+      {
+        "node": "grillo",
+        "connections": 4,
+        "bytes": 4220365,
+        "mbps": 0.5627153333333333,
+        "errors": 0,
+        "completed_downloads": 0
+      }
+    ],
+    "timeout_s": 10.0
+  }
+]

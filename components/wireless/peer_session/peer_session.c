@@ -59,8 +59,15 @@ static bool read_exact(peer_session_t *session, uint8_t *data, unsigned len, boo
         if (session->admitted) {
             if (!nm_owns(&session->link)) return false;
             if (now - session->renewed_ms >= RENEW_MS) {
-                if (!nm_renew(&session->link)) return false;
+                if (!nm_renew(&session->link)) {
+                    os_diag("session","event=renew_failed role=%u session=%lu",node_get_device_orientation(),(unsigned long)session->link.session);
+                    return false;
+                }
                 session->renewed_ms = now_ms();
+                if (session->renewed_ms-session->renewal_trace_ms>=30000) {
+                    session->renewal_trace_ms=session->renewed_ms;
+                    os_diag("session","event=renewed role=%u session=%lu",node_get_device_orientation(),(unsigned long)session->link.session);
+                }
             }
         }
         fd_set readers;
@@ -93,6 +100,7 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
         if (!session->stopping && session->sock < 0) {
             session->sock = sock;
             session->admitted = false;
+            session->renewal_trace_ms = 0;
             memset(&session->link, 0, sizeof(session->link));
             started = true;
         }
@@ -151,6 +159,7 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
         started = session->admitted;
     });
     session->renewed_ms = now_ms();
+    os_diag("session","event=admitted role=%u peer=%s session=%lu station=%u ap=%u",node_get_device_orientation(),peer_uuid,(unsigned long)token,link->station_orientation,link->ap_orientation);
     return started;
 }
 
@@ -160,7 +169,10 @@ void peer_session_close(peer_session_t *session) {
         if (session->sock >= 0) shutdown(session->sock, SHUT_RDWR);
         session->sock = -1;
     });
-    if (session->link.session) nm_release(&session->link);
+    if (session->link.session) {
+        os_diag("session","event=released role=%u session=%lu",node_get_device_orientation(),(unsigned long)session->link.session);
+        nm_release(&session->link);
+    }
     memset(&session->link, 0, sizeof(session->link));
 }
 

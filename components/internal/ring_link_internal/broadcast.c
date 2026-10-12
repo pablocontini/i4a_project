@@ -70,8 +70,13 @@ esp_err_t broadcast_handler(ring_link_payload_t *p)
     }
     else
     {
+        /* Finish the physical ring before a full application queue can
+         * block this task. A sibling callback may itself be waiting for its
+         * broadcast to return; enqueue-before-forward closes that wait cycle.
+         * Protocol-level ACKs still follow application processing. */
+        esp_err_t forwarded = ring_link_lowlevel_forward_payload(p);
         ESP_ERROR_CHECK(ring_link_internal_process(p));
-        return ring_link_lowlevel_forward_payload(p);
+        return forwarded;
     }
 }
 

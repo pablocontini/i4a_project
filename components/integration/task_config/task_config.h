@@ -48,6 +48,12 @@
 
 // Callbacks tasks
 
+// Configuration portal tasks
+#define TASK_CONFIG_PORTAL_CORE           1
+#define TASK_CONFIG_PORTAL_STACK          4096
+#define TASK_CONFIG_PORTAL_APPLY_STACK    4096
+#define TASK_CONFIG_PORTAL_PRIORITY       LOW_PRIORITY
+
 #define TASK_CALLBACK_CORE          0
 #define TASK_CALLBACK_STACK         4096
 #define TASK_CALLBACK_PRIORITY      LOW_PRIORITY
@@ -71,6 +77,10 @@
 #define TASK_NODE_AP_STA_PRIORITY    LOW_PRIORITY
 
 // Routing tasks
+
+#define TASK_NEIGHBOR_CORE           0
+#define TASK_NEIGHBOR_STACK          4096
+#define TASK_NEIGHBOR_PRIORITY       LOW_PRIORITY
 
 #define TASK_ROUTING_CORE           0
 #define TASK_ROUTING_STACK          4096

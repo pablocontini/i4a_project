@@ -17,7 +17,7 @@
 #define SSID_ORIENTATION_OFFSET 4
 
 #define MAX_RETRIES 10
-#define RSSI_THRESHOLD -128 // Minimum RSSI (in dBm) required to consider an AP as available
+#define DEFAULT_RSSI_THRESHOLD_DBM (-128)
 
 static const char* LOGGING_TAG = "station";
 
@@ -74,6 +74,7 @@ void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t ori
   stationPtr->initialized = true;
   stationPtr->event_handlers_registered = false;
   stationPtr->stopping = false;
+  stationPtr->rssi_threshold_dbm = DEFAULT_RSSI_THRESHOLD_DBM;
 
   esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
   assert(sta_netif);
@@ -90,11 +91,11 @@ void station_find_ap(StationPtr stationPtr) {
   wifi_ap_record_t ap;
   wifi_ap_record_t best_ap;
   bool found = false;
-  int best_rssi = RSSI_THRESHOLD;
+  int best_rssi = stationPtr->rssi_threshold_dbm;
 
   while (esp_wifi_scan_get_ap_record(&ap) == ESP_OK) {
 
-    if (ap.rssi < RSSI_THRESHOLD) {
+    if (ap.rssi < stationPtr->rssi_threshold_dbm) {
       continue;
     }
 
@@ -119,6 +120,8 @@ void station_find_ap(StationPtr stationPtr) {
   }
 
   if (found) {
+    node_link_trace("event=scan_selected ssid=%s rssi=%d channel=%u threshold=%d scanned=%u",
+                    best_ap.ssid, best_ap.rssi, best_ap.primary, stationPtr->rssi_threshold_dbm, ap_count);
     memcpy(&stationPtr->wifi_ap_found, &best_ap, sizeof(best_ap));
     stationPtr->ap_found = true;
 
@@ -129,6 +132,7 @@ void station_find_ap(StationPtr stationPtr) {
     transform_wifi_ap_record_to_config(stationPtr);
 
   } else {
+    node_link_trace("event=scan_no_candidate scanned=%u threshold=%d", ap_count, stationPtr->rssi_threshold_dbm);
     ESP_LOGW(LOGGING_TAG, "No allowed APs found");
     stationPtr->ap_found = false;
   }
@@ -139,8 +143,9 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
   if (event_base == WIFI_EVENT) {
     switch (event_id) {
-      case WIFI_EVENT_STA_DISCONNECTED:
+      case WIFI_EVENT_STA_DISCONNECTED: {
         wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
+        node_link_trace("event=wifi_disconnected reason=%u stopping=%u", disconn->reason, (unsigned)stationPtr->stopping);
         if (stationPtr->stopping) {
           client_close();
           stationPtr->is_fully_connected = false;
@@ -159,24 +164,26 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
           stationPtr->is_fully_connected = false;
         }
         
-        if (s_retry_num < MAX_RETRIES) {
-          esp_wifi_connect();
-          s_retry_num++;
-          ESP_LOGI(LOGGING_TAG, "Connection failed, retrying to connect to the AP");
-        } else {
-          ESP_LOGE(LOGGING_TAG, "Failed to connect, disconnecting");
-          s_retry_num = 0;
-          stationPtr->ap_found = false;
-          stationPtr->state = s_inactive;
-          stationPtr->is_fully_connected = false;
-        }
+        /* Reconnection is owned by the discovery task. A Wi-Fi callback
+         * must not start an association after its turn has been released. */
+        node_set_peer_offer_accepted(false);
+        s_retry_num = 0;
+        stationPtr->ap_found = false;
+        stationPtr->state = s_inactive;
+        stationPtr->is_fully_connected = false;
         break;
+      }
     }
   }
 
   if (event_base == IP_EVENT) {
     switch (event_id) {
       case IP_EVENT_STA_GOT_IP:
+        {
+          ip_event_got_ip_t *ip = (ip_event_got_ip_t *)event_data;
+          node_link_trace("event=got_ip ip=" IPSTR " mask=" IPSTR " gw=" IPSTR " stopping=%u",
+                          IP2STR(&ip->ip_info.ip), IP2STR(&ip->ip_info.netmask), IP2STR(&ip->ip_info.gw), (unsigned)stationPtr->stopping);
+        }
         if (stationPtr->stopping) break;
         if(stationPtr->is_fully_connected) {
           if(!stationPtr->is_apsta){
@@ -202,6 +209,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
           stationPtr->is_fully_connected = true;
           esp_netif_dhcpc_stop(stationPtr->netif);
           ESP_ERROR_CHECK(esp_netif_set_ip_info(stationPtr->netif, &static_ip));
+          node_link_trace_ips("static_transport_ip");
         }
         break;
     }
@@ -298,7 +306,7 @@ int8_t station_scan_best_rssi(StationPtr stationPtr) {
 
   while (esp_wifi_scan_get_ap_record(&ap) == ESP_OK) {
 
-    if (ap.rssi < RSSI_THRESHOLD) {
+    if (ap.rssi < stationPtr->rssi_threshold_dbm) {
       continue;
     }
 
@@ -313,4 +321,16 @@ int8_t station_scan_best_rssi(StationPtr stationPtr) {
   }
 
   return best_rssi;
+}
+
+void station_set_rssi_threshold(StationPtr stationPtr,
+                                int8_t rssi_threshold_dbm) {
+  if (stationPtr == NULL || rssi_threshold_dbm > -1) {
+    ESP_LOGW(LOGGING_TAG, "Ignoring invalid RSSI threshold: %d",
+             (int)rssi_threshold_dbm);
+    return;
+  }
+  stationPtr->rssi_threshold_dbm = rssi_threshold_dbm;
+  ESP_LOGI(LOGGING_TAG, "Minimum RSSI set to %d dBm",
+           (int)rssi_threshold_dbm);
 }

@@ -33,14 +33,19 @@ def main():
     for name in ("test_lifecycle", "test_invalid_order_and_hash", "test_expiry_and_flash_failures",
                  "test_partial_select_failure", "test_info_does_not_change_transaction",
                  "test_exchange_serializes_flash_and_maps_acks", "test_exchange_timeout_then_retry",
+                 "test_exchange_maintenance_timeout_and_failed_begin",
                  "test_exchange_reboot_requires_every_successful_ack",
+                 "test_begin_waits_for_application_ready",
                  "test_boot_recovery_without_ring_and_no_restart_loop",
-                 "test_boot_failure_keeps_rollback_deadline"):
+                 "test_boot_failure_keeps_rollback_deadline",
+                 "test_boot_barrier_waits_for_every_confirmed_board",
+                 "test_boot_resume_cannot_be_injected_from_uart",
+                 "test_radio_cut_validation_retry_and_maintenance"):
         test = getattr(native, name)
         test.restype = ctypes.c_int
         line = test()
         if line:
-            source = "exchange_test.c" if name.startswith(("test_exchange_", "test_boot_")) else "receiver_test.c"
+            source = "exchange_test.c" if name.startswith(("test_exchange_", "test_boot_", "test_begin_", "test_radio_")) else "receiver_test.c"
             raise AssertionError(f"{name}: failed at {source}:{line}")
         print(f"{name}: OK")
     native.roundtrip.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_void_p]

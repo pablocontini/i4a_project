@@ -1,0 +1,2 @@
+# Combine with normal defaults when generating a fresh laboratory sdkconfig.
+CONFIG_I4A_FAST_TEST_TIMING=y

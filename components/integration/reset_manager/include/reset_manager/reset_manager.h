@@ -7,12 +7,24 @@
 #include "ring_share/ring_share.h"
 
 #define UUID_LENGTH 13
+#define RM_DIRECTIONAL_ANTENNA_COUNT 4
+#define RM_DEFAULT_TX_POWER_QDBM 80
+#define RM_DEFAULT_RSSI_THRESHOLD_DBM (-128)
+#define RM_STARTUP_PACKET_VERSION 2
 
-typedef struct {
+typedef struct __attribute__((packed)) {
     uint8_t opcode;
+    uint8_t version;
     char uuid[UUID_LENGTH];
     uint8_t is_root;
+    uint8_t orientation_mode;
+    uint8_t configuration_mode;
+    uint8_t tx_power_qdbm[RM_DIRECTIONAL_ANTENNA_COUNT];
+    int8_t rssi_threshold_dbm[RM_DIRECTIONAL_ANTENNA_COUNT];
 } rm_startup_packet_t;
+
+_Static_assert(sizeof(rm_startup_packet_t) <= RS_MAX_BROADCAST_LEN,
+               "Startup packet exceeds ring_share capacity");
 
 typedef struct reset_manager {
     ring_share_t *rs;
@@ -28,7 +40,12 @@ void rm_init(ring_share_t *rs);
  * The caller controls OTA confirmation or rollback before restarting. */
 void rm_restart_local(void);
 bool rm_broadcast_reset(void);
-bool rm_broadcast_startup_info(bool is_root);
+bool rm_broadcast_startup_info(
+    bool is_root, bool orientation_mode, bool configuration_mode,
+    const uint8_t tx_power_qdbm[RM_DIRECTIONAL_ANTENNA_COUNT],
+    const int8_t rssi_threshold_dbm[RM_DIRECTIONAL_ANTENNA_COUNT]);
+uint8_t rm_get_local_antenna_power(void);
+int8_t rm_get_local_rssi_threshold(void);
 bool rm_is_device_up(void);
 bool rm_is_root(void);
 bool rm_should_device_reset(void);

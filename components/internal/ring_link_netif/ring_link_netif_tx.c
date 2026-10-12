@@ -1,4 +1,5 @@
 #include "ring_link_netif_tx.h"
+#include "ip_diagnostics.h"
 
 static const char* TAG = "==> ring_link_netif";
 
@@ -39,17 +40,17 @@ esp_netif_t *get_ring_link_tx_netif(void){
 
 static err_t output_function(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
 {
-    // ESP_LOGI(TAG, "Calling output_function(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)");
-    // printf("len %u\n", p->len);
-    // printf("total len %u\n", p->tot_len);
+    (void)ipaddr;
+    if (!netif || !netif->linkoutput) return ERR_IF;
+    if (!p || !p->payload || p->len == 0) return ERR_VAL;
     ESP_LOGD(TAG, "Output function - len: %zu, tot_len: %zu", p->len, p->tot_len);
     struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
     if((IPH_V(iphdr) == 4) || (IPH_V(iphdr) == 6)){
-        netif->linkoutput(netif, p);
-    }else {
-        ESP_LOGW(TAG, "Non-IP packet received!");
+        /* lwIP must observe a failed SPI handoff, including ERR_MEM. */
+        return netif->linkoutput(netif, p);
     }
-    return ESP_OK;
+    ESP_LOGW(TAG, "Non-IP packet received!");
+    return ERR_VAL;
 }
 
 static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
@@ -61,9 +62,11 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
     // ip4_debug_print(q);
     esp_netif_t *esp_netif = esp_netif_get_handle_from_netif_impl(netif);
     esp_err_t ret = ESP_FAIL;
+    ip_diag_pbuf(p, IP_DIAG_SPI_TX_ATTEMPT, 0);
 
     if (!esp_netif) {
         LWIP_DEBUGF(NETIF_DEBUG, ("corresponding esp-netif is NULL: netif=%p pbuf=%p len=%d\n", netif, p, p->len));
+        ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ERR_IF);
         return ERR_IF;
     }
     if (q->next == NULL) {
@@ -74,6 +77,7 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
         if (q != NULL) {
             pbuf_copy(q, p);
         } else {
+            ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ERR_MEM);
             return ERR_MEM;
         }
         ret = esp_netif_transmit(esp_netif, q->payload, q->len);
@@ -82,8 +86,10 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
     }
     /* Check error */
     if (likely(ret == ESP_OK)) {
+        ip_diag_pbuf(p, IP_DIAG_SPI_TX_OK, ret);
         return ERR_OK;
     }
+    ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ret);
     if (ret == ESP_ERR_NO_MEM) {
         return ERR_MEM;
     }

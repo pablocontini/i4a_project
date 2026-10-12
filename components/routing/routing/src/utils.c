@@ -26,6 +26,7 @@ network_t get_node_subnet(const network_t *node_network, orientation_t orientati
 }
 
 void add_global_route(routing_t *self, const network_t *route, orientation_t output) {
+    os_diag("routing","event=route_add orientation=%u network=%08lx mask=%08lx output=%u",self->orientation,(unsigned long)route->addr,(unsigned long)route->mask,output);
     WITH_LOCK(&self->node_state.m_lock, {
         routing_table_add(&self->node_state.routing_table, route->addr, route->mask, output);
     });
@@ -33,6 +34,7 @@ void add_global_route(routing_t *self, const network_t *route, orientation_t out
 }
 
 void remove_routes_by_output(routing_t *self, orientation_t output) {
+    os_diag("routing","event=route_remove_output orientation=%u output=%u",self->orientation,output);
     WITH_LOCK(&self->node_state.m_lock, { routing_table_remove_by_output(&self->node_state.routing_table, output); });
     ss_refresh(self->deps.ss, RS_ROUTING);
 }

@@ -15,6 +15,7 @@
 
 #include "info_manager/info_manager.h"
 #include "esp_wifi.h"
+#include "esp_timer.h"
 #include "task_config.h"
 
 #define UDP_SERVER_IP   "10.255.255.254"
@@ -22,10 +23,18 @@
 
 #define MAX_PAYLOAD_BUFFER 1400
 
-#define BROADCAST_INTERVAL_MS   (5 * 60 * 1000)     // 5 min
+#include "sdkconfig.h"
+#ifdef CONFIG_I4A_FAST_TEST_TIMING
+#define BROADCAST_INTERVAL_MS   (5 * 1000)
+#define CLIENT_INITIAL_DELAY_MS 1000
+#define CLIENT_POST_INTERVAL_MS (5 * 1000)
+#define ORIENTATION_SPREAD_MS   200
+#else
+#define BROADCAST_INTERVAL_MS   (30 * 1000)         // Fresh admission evidence during cuts.
 #define CLIENT_INITIAL_DELAY_MS (5 * 60 * 1000)     // 5 min
 #define CLIENT_POST_INTERVAL_MS (60 * 1000)         // 1 min
 #define ORIENTATION_SPREAD_MS   (60 * 1000)         // 1 min per orientation
+#endif
 
 static const char *TAG = "info_manager";
 
@@ -73,7 +82,7 @@ static void im_client_task(void *arg)
             sizeof(payload) - offset,
             "{\"fields\":[\"orientation\",\"uuid\",\"link\","
             "\"subnet\",\"mask\",\"channel\",\"rssi\","
-            "\"rx_bytes\",\"tx_bytes\"],\"data\":["
+            "\"rx_bytes\",\"tx_bytes\",\"peer_admitted\",\"sample_age_ms\"],\"data\":["
         );
 
         for (int i = 0; i < MAX_ORIENTATIONS; i++) {
@@ -99,7 +108,7 @@ static void im_client_task(void *arg)
             offset += snprintf(
                 payload + offset,
                 sizeof(payload) - offset,
-                "[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%d,%" PRIu64 ",%" PRIu64 "]",
+                "[\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%d,%d,%" PRIu64 ",%" PRIu64 ",%u,%lld]",
                 orientation_names[ring[i].orientation % MAX_ORIENTATIONS],
                 ring[i].uuid,
                 ring[i].link,
@@ -108,7 +117,9 @@ static void im_client_task(void *arg)
                 ring[i].channel,
                 ring[i].rssi,
                 ring[i].rx_bytes,
-                ring[i].tx_bytes
+                ring[i].tx_bytes,
+                (unsigned)ring[i].peer_admitted,
+                (long long)(im->received_us[i] ? (esp_timer_get_time()-im->received_us[i])/1000 : -1)
             );
 
             if (offset >= MAX_PAYLOAD_BUFFER - 50) {
@@ -127,6 +138,7 @@ static void im_client_task(void *arg)
 
         ESP_LOGD(TAG, "UDP Payload (%d): %s", offset, payload);
 
+        node_link_trace_ips("telemetry_transport");
         int err = sendto(
             sock,
             payload,
@@ -184,6 +196,7 @@ static void im_on_sibling_message(
     }
 
     im->ring[idx] = *pkt;
+    im->received_us[idx] = esp_timer_get_time();
 
     ESP_LOGD(TAG,
              "Updated info for orientation %d: UUID=%s",
@@ -229,6 +242,7 @@ bool im_broadcast_info(void)
     pkt.subnet      = node_get_device_subnet();
     pkt.mask        = node_get_device_mask();
     pkt.rssi        = node_get_device_rssi();
+    pkt.peer_admitted = node_has_active_wireless_peer();
 
     pkt.rx_bytes = node_traffic_get_rx_count();
     pkt.tx_bytes = node_traffic_get_tx_count();
@@ -244,6 +258,7 @@ bool im_broadcast_info(void)
              node_get_link_name());
 
     im->ring[pkt.orientation] = pkt;
+    im->received_us[pkt.orientation] = esp_timer_get_time();
 
     return rs_broadcast(
         im->rs,

@@ -19,6 +19,8 @@ extern "C" {
 
 esp_err_t ring_link_lowlevel_init(QueueHandle_t **queue);
 
+void ring_link_lowlevel_set_maintenance(bool active);
+
 esp_err_t ring_link_lowlevel_transmit_payload(ring_link_payload_t *p);
 
 esp_err_t ring_link_lowlevel_forward_payload(ring_link_payload_t *p);

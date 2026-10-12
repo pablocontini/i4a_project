@@ -403,6 +403,50 @@ pending_verify uint8 y recovery_pending uint8 (byte 50). La respuesta INFO actua
 tiene 51 bytes; las versiones anteriores tienen 50 y no incluyen recuperación
 automática. Se esperan ACK por cada rol solicitado.
 
+## Inicio y diagnóstico de OTA
+
+Cada placa habilita las cargas después de completar el ruteo, el inicio de WiFi
+y la confirmación del arranque. El centro abre UART0 después de
+`I4ABOOT ... stage=app_main.ready`. Los periféricos pueden responder INFO durante
+la inicialización, pero rechazan BEGIN con `ESP_ERR_INVALID_STATE` hasta estar
+listos. Un INFO con `phase=0` por sí solo no garantiza que un periférico haya
+terminado de arrancar.
+
+Para conservar los diagnósticos del centro en PowerShell:
+
+```powershell
+python gateway/flash_node.py --port COM5 --roles center,north,south,east,west --image app/build/main.bin --verbose 2>&1 | Tee-Object -FilePath ota-diagnostico.log
+```
+
+Las líneas `I4AOTA_DIAG` aparecen con `--verbose` aunque los logs normales de IDF
+estén deshabilitados. Incluyen el tiempo desde el arranque y el rol local
+(0=north, 1=south, 2=east, 3=west, 4=center; 255 antes de conocer el rol).
+
+- `boot`: motivo de reinicio numérico de `esp_reset_reason()`.
+- `begin_not_ready`: solicitud de carga antes de completar el arranque.
+- `session_expired`: sesión descartada después de 120 segundos sin actividad OTA.
+- `serial_invalid_length`, `serial_invalid_hex`, `serial_invalid_packet` y
+  `serial_line_overflow`: entradas OTA serie descartadas por formato o tamaño.
+- `request_broadcast_failed` / `reply_broadcast_failed`: el broadcast no confirmó
+  su vuelta por el anillo. La petición puede haber llegado a una placa; no equivale
+  a un rechazo de escritura.
+- `peer_ack`: tiempo de respuesta por placa en operaciones de control o cuando
+  DATA demora al menos 250 ms o devuelve error.
+- `ack_timeout`: placa esperada, tiempo por placa y total, máscara de ACK recibidos,
+  respuestas ignoradas y resultado del broadcast. El plazo de 15 segundos se
+  comparte entre los periféricos; el centro se procesa después de todos ellos.
+- `ring_discards`: contadores acumulados desde el arranque de paquetes OTA inválidos
+  y mensajes descartados por la cola OTA llena. No cuentan pérdidas anteriores
+  al callback OTA, como descartes del CRC de la trama exterior SPI.
+- `exchange_end`: estado y bytes escritos del centro, resultado y máscara de ACK
+  periféricos. Se imprime en operaciones de control, errores y cada 128 secuencias
+  DATA para limitar el tráfico de diagnóstico.
+
+Los diagnósticos locales de un periférico requieren capturar su UART; no se
+reenvían al centro. La salida usa el mismo bloqueo que los ACK para evitar
+intercalar texto dentro de una trama OTA. Instalar este firmware por USB en las
+cinco placas antes de usarlo para diagnosticar una nueva carga OTA.
+
 ## Validación
 
 ```sh
@@ -474,3 +518,88 @@ Antes de usarlo en campo, completar las pruebas con el nodo físico: consulta de
 carga completa, desconexión del USB durante DATA, pérdida de alimentación durante
 la activación y arranque de una imagen que falle antes de confirmarse. Las pruebas
 en PC y la compilación no validan los tiempos SPI/UART ni la recuperación eléctrica.
+
+
+### Pausa del anillo durante OTA
+
+Antes de enviar BEGIN, el centro entra en mantenimiento. Cada periferico drena
+su transmision activa y entra en mantenimiento antes de confirmar BEGIN. El
+flasheador espera todos esos ACK antes de enviar el primer DATA. Usar `--roles`
+con todas las placas fisicamente presentes: una placa excluida no participa de
+la pausa. No cambia el formato del protocolo ni el comando del flasheador.
+
+Durante la pausa, ring_share admite RS_NODE_OTA y RS_RESET_MANAGER. El reinicio y el
+mensaje de startup del centro deben llegar a las perifericas aun pausadas. Los envios normales
+fallan inmediatamente y los mensajes normales recibidos no se entregan a los
+componentes. El transporte inferior descarta tambien las tramas IP, tanto nuevas
+como reenviadas, para que no compitan durante las escrituras de flash. Las tramas
+internas siguen recorriendo el anillo para completar las transmisiones en curso
+al entrar en mantenimiento. No se almacena trafico para reproducirlo despues.
+El reloj de leases de neighbor_manager queda congelado y las renovaciones de
+conexiones existentes se resuelven localmente. Las nuevas admisiones se rechazan.
+El servicio de red puede interrumpirse mientras se actualiza el nodo.
+
+El mantenimiento termina al abortar localmente, al fallar BEGIN sin abrir una
+sesion, o al vencer 120 segundos sin actividad OTA de esa sesion. Se conserva
+hasta el reinicio cuando SELECT tiene exito. INFO no prolonga la pausa. Una
+transmision interrumpida puede dejar algunas placas pausadas hasta el vencimiento;
+no se necesita un ACK de las otras placas para salir por ese vencimiento.
+
+Diagnosticos nuevos: `I4AOTA_DIAG event=maintenance_enter` y `maintenance_leave`,
+con el identificador de sesion. `I4ANM event=duplicates_suppressed` cuenta pedidos
+identicos del mismo propietario suprimidos durante una ventana de 30 segundos,
+incluyendo copias que llegan mientras el worker envia la respuesta. Los pedidos
+con otro numero, comando o contenido se procesan normalmente. La ventana permite
+reutilizar numeros despues de reiniciar una periferica.
+
+Para migrar desde la primera version de mantenimiento (ELF `9829df4b...`),
+instalar esta correccion por USB en todas las placas. Esa version filtraba
+RS_RESET_MANAGER y no podia completar el reinicio de las perifericas, incluso
+con la transferencia aislada. Despues repetir la actualizacion con vecinos y
+guardar un registro nuevo con `--verbose`. La imagen
+que ejecuta cada placa debe incluir la pausa; enviar la nueva imagen a firmware
+anterior no modifica el comportamiento durante esa misma transferencia.
+
+
+### Recuperacion coordinada durante el arranque
+
+Cada placa comienza con `boot_paused=1`. El bloqueo de arranque mantiene vivos
+RESET, STARTUP, OTA, sincronizacion y aprovisionamiento, pero bloquea admisiones
+de vecinos y paquetes IP en SPI. No se libera al confirmar localmente el firmware
+ni al vencer la sesion OTA. Tambien se aplica en el arranque limpio posterior al
+reinicio automatico de recuperacion, sin depender de variables conservadas en RAM.
+
+Despues de su inicializacion, el centro comprueba las cinco placas mediante INFO.
+Para abrir el trafico requiere respuestas con el mismo hash ELF, `phase=0`,
+`ready=1`, `pending_verify=0` y `recovery_pending=0` en todas. Despues envia una orden
+interna de reanudacion y espera sus ACK; cada placa la aplica con una demora de
+cinco segundos. Si falta una placa o sigue pendiente, los vecinos permanecen
+bloqueados y el centro vuelve a comprobar. Esta barrera usa las cinco orientaciones
+del nodo completo; una instalacion parcial no habilita los vecinos automaticamente.
+La orden interna no puede enviarse como un comando UART del flasheador.
+
+INFO agrega `ready` y `boot_paused`, manteniendo los primeros 51 bytes compatibles.
+Usar el flasheador actualizado del repositorio: lee INFO de 50, 51 o 53 bytes y
+no inicia otra carga ni declara el arranque verificado mientras falte readiness
+o permanezca la pausa. La barrera funciona sin tener conectado el flasheador.
+
+Diagnosticos esperados: `boot_traffic_paused`, `boot_ring_probe ready_mask=0x1f`,
+`boot_resume_scheduled` y `boot_traffic_resumed`. La mascara indica las placas listas
+con firmware confirmado; `0x1f` incluye las cinco. Durante el primer arranque OTA
+se mantiene la pausa hasta el reinicio automatico existente a los 120 segundos.
+No se elimina el watchdog de rollback de 90 segundos ni se confirma una imagen
+antes de completar la inicializacion de la aplicacion.
+
+El receptor SPI usa la [API de recepcion en cola de ESP-IDF](https://docs.espressif.com/projects/esp-idf/en/v5.4.1/esp32/api-reference/peripherals/spi_slave.html).
+Prepara ocho descriptores DMA persistentes con
+`spi_slave_queue_trans` y recoge resultados con `spi_slave_get_trans_result`.
+El ISR se registra con ESP_INTR_FLAG_IRAM y no llama callbacks de aplicacion.
+Los buffers vuelven al pool despues del consumo, nunca mientras el driver los
+posee. Las recepciones truncadas se descartan. `I4ASPI event=rx_ready queued=8
+iram=1` permite comprobar la configuracion al arrancar. Esta mejora reduce el
+hueco de rearme; no agrega un GPIO de handshake entre placas.
+
+Para migrar desde `9a702a9f...`, instalar por USB esta version en las cinco placas,
+esperar la apertura de la barrera y luego ejecutar la prueba OTA con vecinos.
+Una mezcla de versiones antiguas sin readiness deja la barrera cerrada.
+Guardar el nuevo registro como `ota-vecinos-arranque-coordinado.log`.

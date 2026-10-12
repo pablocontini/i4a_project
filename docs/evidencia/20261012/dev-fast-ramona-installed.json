@@ -1,0 +1,43 @@
+{
+  "node": "ramona",
+  "port": "COM5",
+  "version": "dev-fast-20261011-ramona",
+  "expected_elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+  "roles": {
+    "north": {
+      "elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "south": {
+      "elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "east": {
+      "elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "west": {
+      "elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "center": {
+      "elf_sha256": "60b476dad292a526d38957c006e1692628b9a1941da0611076c02edcde9f19cb",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    }
+  }
+}

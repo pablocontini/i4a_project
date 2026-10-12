@@ -1,0 +1,10 @@
+menu "I4A development"
+    config I4A_FAST_TEST_TIMING
+        bool "Use short telemetry and redundant discovery delays"
+        default n
+        help
+            Laboratory only: redundant discovery waits 5 to 10 seconds,
+            telemetry starts after 1 second and repeats every 5 seconds.
+            Disable before deployment. Admission rules and turn leases
+            remain unchanged.
+endmenu

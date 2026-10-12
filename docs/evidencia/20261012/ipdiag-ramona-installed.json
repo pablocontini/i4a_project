@@ -1,0 +1,43 @@
+{
+  "node": "ramona",
+  "port": "COM5",
+  "version": "dev-ipdiag-20261012-ramona",
+  "expected_elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+  "roles": {
+    "north": {
+      "elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "south": {
+      "elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "east": {
+      "elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "west": {
+      "elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "center": {
+      "elf_sha256": "04ae7ffc55cc36c1bdc1aa184566b1374f024b4e97d6ee4945e470e3ddcd13ce",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    }
+  }
+}

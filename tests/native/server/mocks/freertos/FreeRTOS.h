@@ -1,0 +1,6 @@
+#ifndef I4A_SERVER_TEST_FREERTOS_FREERTOS_H
+#define I4A_SERVER_TEST_FREERTOS_FREERTOS_H
+#define pdMS_TO_TICKS(x) (x)
+#define pdPASS 1
+
+#endif

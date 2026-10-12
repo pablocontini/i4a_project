@@ -13,6 +13,7 @@ typedef struct {
     bool admitted;
     nm_link_id_t link;
     uint64_t renewed_ms;
+    uint64_t renewal_trace_ms;
 } peer_session_t;
 
 bool peer_session_init(peer_session_t *session);

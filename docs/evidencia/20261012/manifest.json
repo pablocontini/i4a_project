@@ -1,0 +1,386 @@
+[
+  {
+    "file": "buf0-load-center-counts.json",
+    "source": "build/firmware/buf0-load-center-counts.json",
+    "bytes": 35657,
+    "sha256": "08956cfb6dfd005cdec52e261fb9436091c579743d0a61620124e5f04a3d96ff"
+  },
+  {
+    "file": "buf0-load-client-ip.csv",
+    "source": "build/firmware/buf0-load-client-ip.csv",
+    "bytes": 3751,
+    "sha256": "9a7b2d1c668fd507520dd7d216f8bdca758d658be551b2a9ef039feb11f83eb1"
+  },
+  {
+    "file": "buf0-load-east-counts.json",
+    "source": "build/firmware/buf0-load-east-counts.json",
+    "bytes": 35677,
+    "sha256": "8b8745e1e6d2d6e89d1597be9c55a0ea045dc6eae93f8453bb8df0e83e0c9914"
+  },
+  {
+    "file": "buf0-load-results.json",
+    "source": "build/firmware/buf0-load-results.json",
+    "bytes": 4195,
+    "sha256": "b5d9777fa3c9c944451cc699fb914b2234b2309ffc86592290673b24b87d9378"
+  },
+  {
+    "file": "buf0-ramona-installed.json",
+    "source": "build/firmware/buf0-ramona-installed.json",
+    "bytes": 1269,
+    "sha256": "3c104588a0c5bf13d7a98e3b6ef27f3cb4e09be9e4f41e2c1b66608d60206dcd"
+  },
+  {
+    "file": "buf8-load-center-counts.json",
+    "source": "build/firmware/buf8-load-center-counts.json",
+    "bytes": 35985,
+    "sha256": "10201d62ba03904b8ac34b1b98ebea7293a5d8d7b6b44c3cea5593bfe27722a9"
+  },
+  {
+    "file": "buf8-load-client-ip.csv",
+    "source": "build/firmware/buf8-load-client-ip.csv",
+    "bytes": 3751,
+    "sha256": "7ed2c18be8ed37bc0d0e08933c77ed496669d0eb5523c1a2e2c5ca2ad27169c3"
+  },
+  {
+    "file": "buf8-load-east-counts.json",
+    "source": "build/firmware/buf8-load-east-counts.json",
+    "bytes": 35985,
+    "sha256": "67fc602250948e2ec3b382de93ff2231d36a4b7006d9beb759f21b57772ebd88"
+  },
+  {
+    "file": "buf8-load-results.json",
+    "source": "build/firmware/buf8-load-results.json",
+    "bytes": 4151,
+    "sha256": "1c903a0ae6a5f2014fee4345a547854cc08659c3a7b595b6e0f8ad98d07ba209"
+  },
+  {
+    "file": "buf8-ramona-installed.json",
+    "source": "build/firmware/buf8-ramona-installed.json",
+    "bytes": 1269,
+    "sha256": "fbbd9027391b73cdc2dd16f0c30b94a1780bea18c5174f812990f4f66d335262"
+  },
+  {
+    "file": "buffers-baseline-memory.txt",
+    "source": "build/firmware/buffers-baseline-memory.txt",
+    "bytes": 360,
+    "sha256": "456207ca26e457f10cb61c909eef9eb06f94a71d32d5773a77190493376b387d"
+  },
+  {
+    "file": "buffers-spare-memory.txt",
+    "source": "build/firmware/buffers-spare-memory.txt",
+    "bytes": 360,
+    "sha256": "1849a1cd738fa92d4896b61cc9b02cceb4bf4cd20a241cb9ba74201c89c0af59"
+  },
+  {
+    "file": "dev-fast-grillo-installed.json",
+    "source": "build/firmware/dev-fast-grillo-installed.json",
+    "bytes": 1269,
+    "sha256": "a7cd674615598e681334295b87d054c66a5e5b05a9ff16075fc5a61c66232e2f"
+  },
+  {
+    "file": "dev-fast-ramona-installed.json",
+    "source": "build/firmware/dev-fast-ramona-installed.json",
+    "bytes": 1269,
+    "sha256": "c2106d332886cc9a812dd7610936fd28be19032b14f26437759a970f49538f25"
+  },
+  {
+    "file": "dev-fast-root-installed.json",
+    "source": "build/firmware/dev-fast-root-installed.json",
+    "bytes": 1267,
+    "sha256": "3c578292c0d1b9978c079897ee7032d94d59f8d68fd63b1cbbfba9a4298ee566"
+  },
+  {
+    "file": "dual-load-repeat.json",
+    "source": "build/firmware/dual-load-repeat.json",
+    "bytes": 591,
+    "sha256": "75959570c84c628a5d9f8be249977fb1ffe579fc30a3dc042fd3e37f898894ab"
+  },
+  {
+    "file": "dual-load-results.json",
+    "source": "build/firmware/dual-load-results.json",
+    "bytes": 1468,
+    "sha256": "230770b9cb0cf6d5a50a799f3ff914ba19af5dcd14a2bd94dc61701c510f359a"
+  },
+  {
+    "file": "dual-long-pcap-analysis.json",
+    "source": "build/firmware/dual-long-pcap-analysis.json",
+    "bytes": 20043,
+    "sha256": "c702a26b214ed45bfa5c7a8c562e94f962531aa0e7156e55220ac21c22ad4956"
+  },
+  {
+    "file": "dual-long-results-both-grillo-samples.jsonl",
+    "source": "build/firmware/dual-long-results-both-grillo-samples.jsonl",
+    "bytes": 6377,
+    "sha256": "225cb49b7ad9d1f20ca48720660ad173119050ba88d2009cf3f31f217622663a"
+  },
+  {
+    "file": "dual-long-results-both-ramona-samples.jsonl",
+    "source": "build/firmware/dual-long-results-both-ramona-samples.jsonl",
+    "bytes": 6321,
+    "sha256": "9e8ba4af3fb4b849c26f65830f6ad277afd2d307ee4485e8263bbe19168319b3"
+  },
+  {
+    "file": "dual-long-results.json",
+    "source": "build/firmware/dual-long-results.json",
+    "bytes": 582,
+    "sha256": "c11dfbd3df188644393ce0f70c6258a54333ef785946b7169381920cd27082e8"
+  },
+  {
+    "file": "east-center-center-counts.json",
+    "source": "build/firmware/east-center-center-counts.json",
+    "bytes": 21401,
+    "sha256": "e681ab3f0a5f476fcbcf6977826d7b2f683cf8fa5a234ff685c4b67b3eae4c3a"
+  },
+  {
+    "file": "east-center-east-counts.json",
+    "source": "build/firmware/east-center-east-counts.json",
+    "bytes": 21245,
+    "sha256": "bbe3a79c1bc8f331fc134baf911ffeb5f6cc6455fca4b50ab79e891975996001"
+  },
+  {
+    "file": "east-center-results.json",
+    "source": "build/firmware/east-center-results.json",
+    "bytes": 4154,
+    "sha256": "b968575c1f843e059002964d90f76cba2fd244edce2ef08256b8e04e5360e618"
+  },
+  {
+    "file": "grillo-control-pcap-analysis.json",
+    "source": "build/firmware/grillo-control-pcap-analysis.json",
+    "bytes": 35486,
+    "sha256": "e409e706264aab5716f9fd398919c3f59a468dc1921dd31e8e442002bfe1a0f3"
+  },
+  {
+    "file": "grillo-control-results.json",
+    "source": "build/firmware/grillo-control-results.json",
+    "bytes": 4181,
+    "sha256": "bacc85641adbf62566ddd13ff8ddd8eccbbd4e8854bbd2ec55beaeadb21e564b"
+  },
+  {
+    "file": "ipdiag-ramona-installed.json",
+    "source": "build/firmware/ipdiag-ramona-installed.json",
+    "bytes": 1271,
+    "sha256": "64712d2100c4e28b1f5a2ad7d9127a9fb7e31c0ce4e42aecbd19b52516cba3aa"
+  },
+  {
+    "file": "linkdiag-grillo-installed.json",
+    "source": "build/firmware/linkdiag-grillo-installed.json",
+    "bytes": 1269,
+    "sha256": "46937ddd4370c111246076ffccc8601f3f0bcf313a036ef2463a57b335db028c"
+  },
+  {
+    "file": "linkdiag-load-grillo-counts.json",
+    "source": "build/firmware/linkdiag-load-grillo-counts.json",
+    "bytes": 11775,
+    "sha256": "c0035fc872744becb3cf510ade8e4c4c1552ca314b764dc23d62d83c3edf222c"
+  },
+  {
+    "file": "linkdiag-load-ramona-counts.json",
+    "source": "build/firmware/linkdiag-load-ramona-counts.json",
+    "bytes": 12211,
+    "sha256": "b8e2e7883bab4824bd5b5d31b23fff5573aee5a930af8cc81b8ea0280b83aa6b"
+  },
+  {
+    "file": "linkdiag-load-results.json",
+    "source": "build/firmware/linkdiag-load-results.json",
+    "bytes": 4167,
+    "sha256": "3cccae8bf83c4d33e5ebbd107c94e447cbd1fc69c8cfd4eab29d542abcd0cdb6"
+  },
+  {
+    "file": "linkdiag-load-root-counts.json",
+    "source": "build/firmware/linkdiag-load-root-counts.json",
+    "bytes": 12211,
+    "sha256": "8ac3c1b5504f0414f1a5b128fb470869fef7b6e34aed0523429163e53d8727e0"
+  },
+  {
+    "file": "linkdiag-ramona-installed.json",
+    "source": "build/firmware/linkdiag-ramona-installed.json",
+    "bytes": 1269,
+    "sha256": "6e252bd5525aee305dbc58040ed7b70560a3a46a1f81613beb8d21823728c3d2"
+  },
+  {
+    "file": "linkdiag-root-installed.json",
+    "source": "build/firmware/linkdiag-root-installed.json",
+    "bytes": 1267,
+    "sha256": "9c66b3e3fa6886abdb8eae8a8d01776d2aa5f5984da866f33b09407e8f146c5b"
+  },
+  {
+    "file": "multi8-pcap-analysis.json",
+    "source": "build/firmware/multi8-pcap-analysis.json",
+    "bytes": 27278,
+    "sha256": "7a54baed7dd2708ae21d213d3a45c5e764efa69369063ccb183299c4e12252d1"
+  },
+  {
+    "file": "multi8-results.json",
+    "source": "build/firmware/multi8-results.json",
+    "bytes": 2848,
+    "sha256": "e479eb2f1f0c3e95bd0e983a887cd39d06e8202df891c569f04c80f1ddfd598b"
+  },
+  {
+    "file": "multi8-t10-pcap-analysis.json",
+    "source": "build/firmware/multi8-t10-pcap-analysis.json",
+    "bytes": 24906,
+    "sha256": "efd708081459f21dfe4a5161b0426986c1a81c979fdd8fb822f5f1820ab2b2ce"
+  },
+  {
+    "file": "multi8-t10-results-both-grillo-0-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-grillo-0-samples.jsonl",
+    "bytes": 3246,
+    "sha256": "a579e4528f0d5fb2738b1eb91dd554ac6ac593da51eaba7311750165a6ba0e67"
+  },
+  {
+    "file": "multi8-t10-results-both-grillo-1-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-grillo-1-samples.jsonl",
+    "bytes": 3061,
+    "sha256": "d90a5825ad3eb7f2ea62a8381abc24c812b8e14e253b3ba3885bba2beef3e368"
+  },
+  {
+    "file": "multi8-t10-results-both-grillo-2-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-grillo-2-samples.jsonl",
+    "bytes": 3244,
+    "sha256": "e562adeeef393241d0ededd6205fc2ec48776cfb57732b32262057e940cf224e"
+  },
+  {
+    "file": "multi8-t10-results-both-grillo-3-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-grillo-3-samples.jsonl",
+    "bytes": 3073,
+    "sha256": "ac36db9b325d26d77ac04ef6ab6e75bf134d799828b64cf34596be6f11e500bb"
+  },
+  {
+    "file": "multi8-t10-results-both-ramona-0-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-ramona-0-samples.jsonl",
+    "bytes": 3206,
+    "sha256": "3fcb0185ebacee5c8f52d6ec971d1a95b5fc6f320464321ce2e74839db2694a8"
+  },
+  {
+    "file": "multi8-t10-results-both-ramona-1-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-ramona-1-samples.jsonl",
+    "bytes": 3218,
+    "sha256": "6137a05933a9ab7d7136233f3501525e67c229b1b0a24110fb0e89a80fdac530"
+  },
+  {
+    "file": "multi8-t10-results-both-ramona-2-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-ramona-2-samples.jsonl",
+    "bytes": 3216,
+    "sha256": "9932c8350be3a786d0fba5d3621ab3821b0c1b47f1e30cea4bad8b8ec80e7084"
+  },
+  {
+    "file": "multi8-t10-results-both-ramona-3-samples.jsonl",
+    "source": "build/firmware/multi8-t10-results-both-ramona-3-samples.jsonl",
+    "bytes": 3227,
+    "sha256": "cd0d5e0ab6dca805e87807c09c94de9933d8c6b5ea70fc8c4040b3137a67ce74"
+  },
+  {
+    "file": "multi8-t10-results.json",
+    "source": "build/firmware/multi8-t10-results.json",
+    "bytes": 2733,
+    "sha256": "c0ecb77402afcc1ca8a06c5e2b5a0cba890d57e27a1bdc08cd109cedb47c8376"
+  },
+  {
+    "file": "multistream-results.json",
+    "source": "build/firmware/multistream-results.json",
+    "bytes": 5800,
+    "sha256": "3b715784fb7c9f8e0786cb8157040ffbd8473752b9e2ea28f81039cc564f6f97"
+  },
+  {
+    "file": "p2pfix-cut-pings.csv",
+    "source": "build/firmware/p2pfix-cut-pings.csv",
+    "bytes": 49680,
+    "sha256": "5cae8f5b8697a5d7474055e7295cc70bfe29475480782636c721d42e172fd28e"
+  },
+  {
+    "file": "p2pfix-grillo-installed.json",
+    "source": "build/firmware/p2pfix-grillo-installed.json",
+    "bytes": 1271,
+    "sha256": "a321b5e3353a2d4d7376f1b4e77d2ea949f47b07b1a7c86a0367328f0a717df1"
+  },
+  {
+    "file": "p2pfix-ramona-installed.json",
+    "source": "build/firmware/p2pfix-ramona-installed.json",
+    "bytes": 1271,
+    "sha256": "78eef24524e09c16533f1c3b90caba36b720c5e76ef4faa0c878bd0e5abc103e"
+  },
+  {
+    "file": "p2pfix-root-installed.json",
+    "source": "build/firmware/p2pfix-root-installed.json",
+    "bytes": 1269,
+    "sha256": "eb5d430640b9b656d0ca5039e7cef18a5dbb7f712160a9aec9590439ab6dbee8"
+  },
+  {
+    "file": "repeat-cut-pings.csv",
+    "source": "build/firmware/repeat-cut-pings.csv",
+    "bytes": 15247,
+    "sha256": "51682620a1120c826dac1e78f10669a037c3d1ff034521cf0fddb614bf6c3df4"
+  },
+  {
+    "file": "return-cut1-pings.csv",
+    "source": "build/firmware/return-cut1-pings.csv",
+    "bytes": 28165,
+    "sha256": "3f10b759a912d672e56d4361f9effcb24cf4a15812a59fa64dd2b896e0d55b1a"
+  },
+  {
+    "file": "return-cut2-pings.csv",
+    "source": "build/firmware/return-cut2-pings.csv",
+    "bytes": 26991,
+    "sha256": "68589b4c7076033c5febae8f426919e008fbfd7c16eccde72d9da1455ad157e1"
+  },
+  {
+    "file": "return-grillo-installed.json",
+    "source": "build/firmware/return-grillo-installed.json",
+    "bytes": 1271,
+    "sha256": "b946bfe665baec0b4b0341dbb46c994fc47c5ab2a17712297ec1df3053de2c87"
+  },
+  {
+    "file": "return-inverse-pings.csv",
+    "source": "build/firmware/return-inverse-pings.csv",
+    "bytes": 29106,
+    "sha256": "26336c307cea5cc6d36bb64d2e3ef5dbad13ba6193cf188f13f56e9b3a3def2a"
+  },
+  {
+    "file": "return-inverse2-pings.csv",
+    "source": "build/firmware/return-inverse2-pings.csv",
+    "bytes": 26140,
+    "sha256": "e8b2dd7062117323ed3ccaa920c68514f9f96ae4c9a0599f5cd2e7e0854a4887"
+  },
+  {
+    "file": "return-ramona-installed.json",
+    "source": "build/firmware/return-ramona-installed.json",
+    "bytes": 1271,
+    "sha256": "4315743ed64a1cb4151e12be8114c790dcb03eb84a908442ff656d0023853d41"
+  },
+  {
+    "file": "return-root-installed.json",
+    "source": "build/firmware/return-root-installed.json",
+    "bytes": 1269,
+    "sha256": "000b24a87e088f4bac0b5160099dac427c96df8bbf71f10dd830aa83242315cc"
+  },
+  {
+    "file": "simultaneous-pings.csv",
+    "source": "build/firmware/simultaneous-pings.csv",
+    "bytes": 17004,
+    "sha256": "a3dafca1ac92689791dc1e431cdd5756b1f9616f0742409d4176de682b1841b1"
+  },
+  {
+    "file": "west-load-grillo-west-counts.json",
+    "source": "build/firmware/west-load-grillo-west-counts.json",
+    "bytes": 22851,
+    "sha256": "f8c0334c99877439045ef2e21999114a05375bfdcd2d8d1652627c9f394b4912"
+  },
+  {
+    "file": "west-load-ramona-center-counts.json",
+    "source": "build/firmware/west-load-ramona-center-counts.json",
+    "bytes": 22224,
+    "sha256": "23e9997d52b5e839932d9525da0beb9b5a0e91cba819b1070f246ebbabd80f6c"
+  },
+  {
+    "file": "west-load-results.json",
+    "source": "build/firmware/west-load-results.json",
+    "bytes": 4186,
+    "sha256": "c764c0518af33b5fdaedb49a0025e7fa91e44c4955c727d7bc45ee05f838dbe9"
+  },
+  {
+    "file": "west-load-root-west-counts.json",
+    "source": "build/firmware/west-load-root-west-counts.json",
+    "bytes": 22035,
+    "sha256": "899164744f301c022aa9c5f3835f488963b97bc2eda7cac13b33e106c446afe6"
+  }
+]

@@ -39,8 +39,15 @@ static void on_new_gateway_request(routing_t *self, const rt_sibl_send_new_gatew
     (void)unused;
     rt_root_state_t *state = GET_STATE(self);
 
+    if (state->gateway_requested)
+        return;
+    os_diag("gateway","event=root_response_scheduled orientation=%u wait_ms=10000",self->orientation);
     state->gateway_requested = true;
     state->gateway_requested_timeout = GATEWAY_REQUEST_TIMEOUT;
+}
+
+static bool tick_needed(routing_t *self) {
+    return GET_STATE(self)->gateway_requested;
 }
 
 static void on_tick(routing_t *self, uint32_t dt_ms) {
@@ -61,7 +68,8 @@ static void on_tick(routing_t *self, uint32_t dt_ms) {
                 .dtr = 1,
             },
         };
-        rs_broadcast(self->deps.rs, RS_ROUTING, &event, sizeof(event));
+        bool sent=rs_broadcast(self->deps.rs,RS_ROUTING,&event,sizeof(event));
+        os_diag("gateway","event=root_response_publish orientation=%u sent=%u",self->orientation,sent);
     } else {
         // Continue waiting
         state->gateway_requested_timeout -= dt_ms;
@@ -78,6 +86,7 @@ bool create_root_core(routing_t *self, uint32_t root_network, uint32_t root_mask
     self->role.impl = (rt_role_impl_t){
         .on_start = on_start,
         .on_tick = on_tick,
+        .tick_needed = tick_needed,
         .on_sibl_send_new_gateway_request = on_new_gateway_request,
     };
 

@@ -57,6 +57,9 @@ void routing_table_add(rt_routing_table_t *table, uint32_t network, uint32_t mas
 }
 
 void routing_table_remove_by_output(rt_routing_table_t *table, uint8_t output) {
+    if (table->default_gateway == output)
+        table->default_gateway = ROUTING_OUTPUT_NONE;
+
     rt_routing_table_t shadow = *table;
     size_t new_count = 0;
     for (size_t i = 0; i < shadow.count; i++) {

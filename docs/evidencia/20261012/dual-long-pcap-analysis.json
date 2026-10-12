@@ -1,0 +1,740 @@
+{
+  "packets": 53168,
+  "capture_start_epoch": 1791811493.300324,
+  "capture_end_epoch": 1791811688.450452,
+  "flows": [
+    {
+      "client": "10.116.0.2",
+      "port": 52540,
+      "start_epoch": 1791811493.300324,
+      "end_epoch": 1791811493.449175,
+      "payload_packets": 2,
+      "payload_bytes": 385,
+      "first_seen_payload_bytes": 385,
+      "exact_repeat_segments": 0,
+      "exact_repeat_bytes": 0,
+      "repeat_examples": [],
+      "client_ack_packets": 4,
+      "consecutive_same_ack_and_window": 0,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 254,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811493.376336,
+          "end": 1791811493.376733,
+          "seconds": 0.00039696693420410156
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 385
+      }
+    },
+    {
+      "client": "10.148.0.4",
+      "port": 52541,
+      "start_epoch": 1791811495.449897,
+      "end_epoch": 1791811495.612808,
+      "payload_packets": 2,
+      "payload_bytes": 385,
+      "first_seen_payload_bytes": 385,
+      "exact_repeat_segments": 0,
+      "exact_repeat_bytes": 0,
+      "repeat_examples": [],
+      "client_ack_packets": 4,
+      "consecutive_same_ack_and_window": 0,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 254,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811495.539306,
+          "end": 1791811495.539694,
+          "seconds": 0.00038814544677734375
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 385
+      }
+    },
+    {
+      "client": "10.148.0.4",
+      "port": 52545,
+      "start_epoch": 1791811508.536976,
+      "end_epoch": 1791811575.764422,
+      "payload_packets": 5821,
+      "payload_bytes": 8493933,
+      "first_seen_payload_bytes": 8388813,
+      "exact_repeat_segments": 72,
+      "exact_repeat_bytes": 105120,
+      "repeat_examples": [
+        {
+          "time": 1791811510.045787,
+          "seq": 853592459,
+          "bytes": 1460,
+          "delay_s": 0.7806360721588135
+        },
+        {
+          "time": 1791811510.055909,
+          "seq": 853593919,
+          "bytes": 1460,
+          "delay_s": 0.790740966796875
+        },
+        {
+          "time": 1791811510.10925,
+          "seq": 853598299,
+          "bytes": 1460,
+          "delay_s": 0.8354761600494385
+        },
+        {
+          "time": 1791811510.109429,
+          "seq": 853599759,
+          "bytes": 1460,
+          "delay_s": 0.8356418609619141
+        },
+        {
+          "time": 1791811510.109604,
+          "seq": 853601219,
+          "bytes": 1460,
+          "delay_s": 0.7303879261016846
+        },
+        {
+          "time": 1791811510.109799,
+          "seq": 853602679,
+          "bytes": 1460,
+          "delay_s": 0.7305698394775391
+        },
+        {
+          "time": 1791811510.109966,
+          "seq": 853604139,
+          "bytes": 1460,
+          "delay_s": 0.7114319801330566
+        },
+        {
+          "time": 1791811510.195437,
+          "seq": 853605599,
+          "bytes": 1460,
+          "delay_s": 0.7968900203704834
+        }
+      ],
+      "client_ack_packets": 3390,
+      "consecutive_same_ack_and_window": 817,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811510.022618,
+          "end": 1791811510.814547,
+          "seconds": 0.7919290065765381
+        },
+        {
+          "start": 1791811514.95217,
+          "end": 1791811515.637172,
+          "seconds": 0.6850020885467529
+        },
+        {
+          "start": 1791811517.973869,
+          "end": 1791811518.511011,
+          "seconds": 0.5371417999267578
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 515165,
+        "1": 494520,
+        "2": 380640,
+        "3": 533940,
+        "4": 535820,
+        "5": 454060,
+        "6": 575240,
+        "7": 1043900,
+        "8": 913960,
+        "9": 575240,
+        "10": 509540,
+        "11": 636780,
+        "12": 912500,
+        "13": 412628
+      }
+    },
+    {
+      "client": "10.116.0.2",
+      "port": 52544,
+      "start_epoch": 1791811508.560674,
+      "end_epoch": 1791811555.031911,
+      "payload_packets": 5809,
+      "payload_bytes": 8477873,
+      "first_seen_payload_bytes": 8388813,
+      "exact_repeat_segments": 61,
+      "exact_repeat_bytes": 89060,
+      "repeat_examples": [
+        {
+          "time": 1791811509.551718,
+          "seq": 207687247,
+          "bytes": 1460,
+          "delay_s": 0.28682589530944824
+        },
+        {
+          "time": 1791811509.551758,
+          "seq": 207690167,
+          "bytes": 1460,
+          "delay_s": 0.2810060977935791
+        },
+        {
+          "time": 1791811509.551773,
+          "seq": 207691627,
+          "bytes": 1460,
+          "delay_s": 0.2810029983520508
+        },
+        {
+          "time": 1791811509.551811,
+          "seq": 207713527,
+          "bytes": 1460,
+          "delay_s": 0.26027989387512207
+        },
+        {
+          "time": 1791811509.55182,
+          "seq": 207714987,
+          "bytes": 1460,
+          "delay_s": 0.2602720260620117
+        },
+        {
+          "time": 1791811509.552519,
+          "seq": 207717907,
+          "bytes": 1460,
+          "delay_s": 0.25957703590393066
+        },
+        {
+          "time": 1791811509.552565,
+          "seq": 207719367,
+          "bytes": 1460,
+          "delay_s": 0.2593350410461426
+        },
+        {
+          "time": 1791811509.552574,
+          "seq": 207720827,
+          "bytes": 1460,
+          "delay_s": 0.25933384895324707
+        }
+      ],
+      "client_ack_packets": 2250,
+      "consecutive_same_ack_and_window": 469,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811515.0728,
+          "end": 1791811515.612112,
+          "seconds": 0.5393121242523193
+        },
+        {
+          "start": 1791811546.562973,
+          "end": 1791811546.923786,
+          "seconds": 0.3608129024505615
+        },
+        {
+          "start": 1791811551.399942,
+          "end": 1791811551.750009,
+          "seconds": 0.350067138671875
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 1240037,
+        "1": 846800,
+        "2": 1543220,
+        "3": 1045360,
+        "4": 754820,
+        "5": 785480,
+        "6": 892060,
+        "7": 582540,
+        "8": 581080,
+        "9": 206476
+      }
+    },
+    {
+      "client": "10.116.0.2",
+      "port": 63075,
+      "start_epoch": 1791811555.032064,
+      "end_epoch": 1791811605.110819,
+      "payload_packets": 5816,
+      "payload_bytes": 8488093,
+      "first_seen_payload_bytes": 8388813,
+      "exact_repeat_segments": 68,
+      "exact_repeat_bytes": 99280,
+      "repeat_examples": [
+        {
+          "time": 1791811556.034708,
+          "seq": 2616479892,
+          "bytes": 1460,
+          "delay_s": 0.3468759059906006
+        },
+        {
+          "time": 1791811556.034717,
+          "seq": 2616481352,
+          "bytes": 1460,
+          "delay_s": 0.3468661308288574
+        },
+        {
+          "time": 1791811556.034753,
+          "seq": 2616482812,
+          "bytes": 1460,
+          "delay_s": 0.342756986618042
+        },
+        {
+          "time": 1791811556.090379,
+          "seq": 2616491572,
+          "bytes": 1460,
+          "delay_s": 0.3934509754180908
+        },
+        {
+          "time": 1791811556.090388,
+          "seq": 2616493032,
+          "bytes": 1460,
+          "delay_s": 0.3934509754180908
+        },
+        {
+          "time": 1791811556.090427,
+          "seq": 2616494492,
+          "bytes": 1460,
+          "delay_s": 0.39323997497558594
+        },
+        {
+          "time": 1791811556.090435,
+          "seq": 2616495952,
+          "bytes": 1460,
+          "delay_s": 0.3932309150695801
+        },
+        {
+          "time": 1791811556.10479,
+          "seq": 2616497412,
+          "bytes": 1460,
+          "delay_s": 0.4044530391693115
+        }
+      ],
+      "client_ack_packets": 2142,
+      "consecutive_same_ack_and_window": 339,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811570.593764,
+          "end": 1791811571.32199,
+          "seconds": 0.7282259464263916
+        },
+        {
+          "start": 1791811594.598326,
+          "end": 1791811595.203419,
+          "seconds": 0.6050930023193359
+        },
+        {
+          "start": 1791811593.956061,
+          "end": 1791811594.522389,
+          "seconds": 0.5663280487060547
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 1202405,
+        "1": 938780,
+        "2": 789860,
+        "3": 449680,
+        "4": 994260,
+        "5": 934400,
+        "6": 969440,
+        "7": 535820,
+        "8": 478880,
+        "9": 1194568
+      }
+    },
+    {
+      "client": "10.148.0.4",
+      "port": 63555,
+      "start_epoch": 1791811575.764536,
+      "end_epoch": 1791811655.560081,
+      "payload_packets": 5829,
+      "payload_bytes": 8505613,
+      "first_seen_payload_bytes": 8388813,
+      "exact_repeat_segments": 80,
+      "exact_repeat_bytes": 116800,
+      "repeat_examples": [
+        {
+          "time": 1791811577.593693,
+          "seq": 1293027371,
+          "bytes": 1460,
+          "delay_s": 0.7986900806427002
+        },
+        {
+          "time": 1791811577.623205,
+          "seq": 1293028831,
+          "bytes": 1460,
+          "delay_s": 0.8281838893890381
+        },
+        {
+          "time": 1791811577.623264,
+          "seq": 1293030291,
+          "bytes": 1460,
+          "delay_s": 0.8012280464172363
+        },
+        {
+          "time": 1791811577.623274,
+          "seq": 1293031751,
+          "bytes": 1460,
+          "delay_s": 0.8012301921844482
+        },
+        {
+          "time": 1791811577.638133,
+          "seq": 1293033211,
+          "bytes": 1460,
+          "delay_s": 0.8074989318847656
+        },
+        {
+          "time": 1791811577.70681,
+          "seq": 1293034671,
+          "bytes": 1460,
+          "delay_s": 0.876154899597168
+        },
+        {
+          "time": 1791811577.707045,
+          "seq": 1293036131,
+          "bytes": 1460,
+          "delay_s": 0.8713271617889404
+        },
+        {
+          "time": 1791811577.707251,
+          "seq": 1293037591,
+          "bytes": 1460,
+          "delay_s": 0.87152099609375
+        }
+      ],
+      "client_ack_packets": 3394,
+      "consecutive_same_ack_and_window": 767,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811600.342171,
+          "end": 1791811601.189772,
+          "seconds": 0.8476009368896484
+        },
+        {
+          "start": 1791811632.381315,
+          "end": 1791811633.048942,
+          "seconds": 0.6676270961761475
+        },
+        {
+          "start": 1791811627.290574,
+          "end": 1791811627.917878,
+          "seconds": 0.6273038387298584
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 435905,
+        "1": 552920,
+        "2": 656800,
+        "3": 791320,
+        "4": 671600,
+        "5": 344560,
+        "6": 386900,
+        "7": 694960,
+        "8": 648240,
+        "9": 462236,
+        "10": 474500,
+        "11": 424860,
+        "12": 521220,
+        "13": 513920,
+        "14": 449680,
+        "15": 475992
+      }
+    },
+    {
+      "client": "10.116.0.2",
+      "port": 63558,
+      "start_epoch": 1791811605.11093,
+      "end_epoch": 1791811644.874944,
+      "payload_packets": 5802,
+      "payload_bytes": 8467653,
+      "first_seen_payload_bytes": 8388813,
+      "exact_repeat_segments": 54,
+      "exact_repeat_bytes": 78840,
+      "repeat_examples": [
+        {
+          "time": 1791811607.86729,
+          "seq": 3668527730,
+          "bytes": 1460,
+          "delay_s": 0.473768949508667
+        },
+        {
+          "time": 1791811608.702799,
+          "seq": 3668698550,
+          "bytes": 1460,
+          "delay_s": 0.24916505813598633
+        },
+        {
+          "time": 1791811608.702854,
+          "seq": 3668700010,
+          "bytes": 1460,
+          "delay_s": 0.24422597885131836
+        },
+        {
+          "time": 1791811608.702864,
+          "seq": 3668701470,
+          "bytes": 1460,
+          "delay_s": 0.24422693252563477
+        },
+        {
+          "time": 1791811608.727347,
+          "seq": 3668702930,
+          "bytes": 1460,
+          "delay_s": 0.2687039375305176
+        },
+        {
+          "time": 1791811608.727394,
+          "seq": 3668704390,
+          "bytes": 1460,
+          "delay_s": 0.24691200256347656
+        },
+        {
+          "time": 1791811608.727402,
+          "seq": 3668705850,
+          "bytes": 1460,
+          "delay_s": 0.24691104888916016
+        },
+        {
+          "time": 1791811608.732609,
+          "seq": 3668707310,
+          "bytes": 1460,
+          "delay_s": 0.25211095809936523
+        }
+      ],
+      "client_ack_packets": 2179,
+      "consecutive_same_ack_and_window": 382,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811627.287249,
+          "end": 1791811627.979373,
+          "seconds": 0.6921238899230957
+        },
+        {
+          "start": 1791811613.140645,
+          "end": 1791811613.473768,
+          "seconds": 0.33312296867370605
+        },
+        {
+          "start": 1791811617.098324,
+          "end": 1791811617.411579,
+          "seconds": 0.31325483322143555
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 984701,
+        "1": 1084196,
+        "2": 810300,
+        "3": 1077480,
+        "4": 1070180,
+        "5": 1305240,
+        "6": 1108140,
+        "7": 1027416
+      }
+    },
+    {
+      "client": "10.116.0.2",
+      "port": 62947,
+      "start_epoch": 1791811644.87512,
+      "end_epoch": 1791811688.449861,
+      "payload_packets": 5126,
+      "payload_bytes": 7481537,
+      "first_seen_payload_bytes": 7423137,
+      "exact_repeat_segments": 40,
+      "exact_repeat_bytes": 58400,
+      "repeat_examples": [
+        {
+          "time": 1791811648.569334,
+          "seq": 1112957460,
+          "bytes": 1460,
+          "delay_s": 0.33087801933288574
+        },
+        {
+          "time": 1791811648.88234,
+          "seq": 1112957460,
+          "bytes": 1460,
+          "delay_s": 0.6438839435577393
+        },
+        {
+          "time": 1791811648.882393,
+          "seq": 1113045060,
+          "bytes": 1460,
+          "delay_s": 0.3660609722137451
+        },
+        {
+          "time": 1791811648.882402,
+          "seq": 1113046520,
+          "bytes": 1460,
+          "delay_s": 0.36605286598205566
+        },
+        {
+          "time": 1791811649.73364,
+          "seq": 1113203616,
+          "bytes": 1460,
+          "delay_s": 0.2404639720916748
+        },
+        {
+          "time": 1791811649.733938,
+          "seq": 1113205076,
+          "bytes": 1460,
+          "delay_s": 0.2377629280090332
+        },
+        {
+          "time": 1791811649.733949,
+          "seq": 1113206536,
+          "bytes": 1460,
+          "delay_s": 0.23775792121887207
+        },
+        {
+          "time": 1791811649.771545,
+          "seq": 1113207996,
+          "bytes": 1460,
+          "delay_s": 0.2750370502471924
+        }
+      ],
+      "client_ack_packets": 1991,
+      "consecutive_same_ack_and_window": 381,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811686.148839,
+          "end": 1791811687.744415,
+          "seconds": 1.5955760478973389
+        },
+        {
+          "start": 1791811667.477006,
+          "end": 1791811668.534069,
+          "seconds": 1.057063102722168
+        },
+        {
+          "start": 1791811672.489903,
+          "end": 1791811673.246897,
+          "seconds": 0.7569940090179443
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 1062501,
+        "1": 1000100,
+        "2": 826360,
+        "3": 776720,
+        "4": 965060,
+        "5": 922136,
+        "6": 849720,
+        "7": 703720,
+        "8": 375220
+      }
+    },
+    {
+      "client": "10.148.0.4",
+      "port": 62951,
+      "start_epoch": 1791811655.56094,
+      "end_epoch": 1791811688.450452,
+      "payload_packets": 2273,
+      "payload_bytes": 3315865,
+      "first_seen_payload_bytes": 3273525,
+      "exact_repeat_segments": 29,
+      "exact_repeat_bytes": 42340,
+      "repeat_examples": [
+        {
+          "time": 1791811656.810026,
+          "seq": 4212688281,
+          "bytes": 1460,
+          "delay_s": 0.5200698375701904
+        },
+        {
+          "time": 1791811656.890212,
+          "seq": 4212698501,
+          "bytes": 1460,
+          "delay_s": 0.5008471012115479
+        },
+        {
+          "time": 1791811657.120686,
+          "seq": 4212688281,
+          "bytes": 1460,
+          "delay_s": 0.8307299613952637
+        },
+        {
+          "time": 1791811657.747648,
+          "seq": 4212787561,
+          "bytes": 1460,
+          "delay_s": 0.5129489898681641
+        },
+        {
+          "time": 1791811657.768037,
+          "seq": 4212789021,
+          "bytes": 1460,
+          "delay_s": 0.5333251953125
+        },
+        {
+          "time": 1791811657.790454,
+          "seq": 4212790481,
+          "bytes": 1460,
+          "delay_s": 0.5554509162902832
+        },
+        {
+          "time": 1791811657.890285,
+          "seq": 4212791941,
+          "bytes": 1460,
+          "delay_s": 0.6552729606628418
+        },
+        {
+          "time": 1791811657.890456,
+          "seq": 4212793401,
+          "bytes": 1460,
+          "delay_s": 0.655195951461792
+        }
+      ],
+      "client_ack_packets": 1300,
+      "consecutive_same_ack_and_window": 296,
+      "client_zero_window_packets": 0,
+      "client_min_raw_window": 255,
+      "rst": [],
+      "syn_count": 2,
+      "largest_new_payload_gaps": [
+        {
+          "start": 1791811686.13361,
+          "end": 1791811687.736156,
+          "seconds": 1.602545976638794
+        },
+        {
+          "start": 1791811667.483336,
+          "end": 1791811668.58772,
+          "seconds": 1.104383945465088
+        },
+        {
+          "start": 1791811672.489842,
+          "end": 1791811673.142087,
+          "seconds": 0.652245044708252
+        }
+      ],
+      "five_second_payload_bytes": {
+        "0": 605685,
+        "1": 468660,
+        "2": 408800,
+        "3": 438000,
+        "4": 562520,
+        "5": 602980,
+        "6": 229220
+      }
+    }
+  ],
+  "limitations": "Exact same seq/length/content repeats are retransmission candidates; capture duplication cannot be excluded. Resegmented overlaps are not counted. Same ACK counts are not Wireshark TCP-analysis classifications. Window raw values are unscaled. RST may be caused by intentional test end."
+}

@@ -9,15 +9,14 @@
 #include "server.h"
 #include "task_config.h"
 #include "device.h"
-#include "priority_manager/priority_manager.h"
 #include "config.h"
+#include "node.h"
 
-#define STA_PRIORITY_WAIT_INTERVAL_SECS 15
-#define RSSI_PRIORITY_SCAN_INTERVAL_SECS 10
 
 static const char *LOGGING_TAG = "device";
 static const char *dev_orientation[5] = {"_N_", "_S_", "_E_", "_W_", "_C_"};
-static TaskHandle_t station_task_handle = NULL;  // Tracks STA connect task
+static TaskHandle_t volatile station_task_handle = NULL;
+static volatile bool station_task_stop;
 
 // Function to initialize NVS (non-volatile storage)
 static esp_err_t init_nvs() {
@@ -47,6 +46,9 @@ esp_err_t device_wifi_init() {
   // Initialize Wi-Fi configuration structure
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+  // Forwarding stations must receive promptly instead of waiting for DTIM.
+  ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
   return ESP_OK;
 }
@@ -170,40 +172,40 @@ void device_start_station(DevicePtr device_ptr) {
 static void device_connect_station_task(void* arg) {
   DevicePtr device_ptr = (DevicePtr)arg;  // Get the device pointer from the task argument
 
-  // Reset list whenever the devices start scanning again (useful for getting rid of provision RSSI during AP+STA mode)
-  pm_reset_priority_list();
-
-  // Start priority determination sequence
-  int8_t scan_rssi = station_scan_best_rssi(device_ptr->station_ptr);
-  pm_provide_to_siblings(scan_rssi);
-  vTaskDelay(pdMS_TO_TICKS(1000 * RSSI_PRIORITY_SCAN_INTERVAL_SECS));
-
-  uint8_t orientation_priority = pm_get_suggested_priority();
-  uint8_t shifted_priorities = (device_ptr->device_orientation - orientation_priority + 4) % 4;
-
-  // Wait in intervals of 10 seconds to avoid simultaneous node connection
-  vTaskDelay(pdMS_TO_TICKS(shifted_priorities * 1000 * STA_PRIORITY_WAIT_INTERVAL_SECS));
-
-  while (1) {
-    if (device_ptr->sta_lock) {
-      vTaskDelay(pdMS_TO_TICKS(60000)); // STA disabled, long sleep
+  /* The central's grant serializes initial discovery and later AP/STA
+   * discovery. In particular, no preliminary RSSI scan bypasses the turn. */
+  while (!station_task_stop) {
+    if (node_has_active_wireless_peer()) {
+      node_release_search_turn();
+      vTaskDelay(pdMS_TO_TICKS(250));
       continue;
     }
-
-    if (!station_is_active(device_ptr->station_ptr)) {
-      ESP_LOGI(LOGGING_TAG, "Wi-Fi not connected. Scanning for APs...");
-      station_find_ap(device_ptr->station_ptr);
-
-      if (station_found_ap(device_ptr->station_ptr)) {
-        ESP_LOGI(LOGGING_TAG, "Wi-Fi found! Connecting...");
-        station_connect(device_ptr->station_ptr);
-      } else {
-        ESP_LOGE(LOGGING_TAG, "No Wi-Fi found. Re-scanning in 10s...");
-        vTaskDelay(pdMS_TO_TICKS(10000));
+    if (device_ptr->sta_lock) {
+      vTaskDelay(pdMS_TO_TICKS(250));
+      continue;
+    }
+    if (!node_search_turn_is_valid()) {
+      if (station_is_active(device_ptr->station_ptr)) {
+        station_disconnect(device_ptr->station_ptr);
+        client_close();
       }
+      /* Once provisioned, the AP/STA controller owns retries and returns
+       * the failed interface to AP before releasing its grant. */
+      if (device_ptr->device_is_apsta || !node_acquire_search_turn()) {
+        vTaskDelay(pdMS_TO_TICKS(250));
+        continue;
+      }
+    }
+    if (!station_is_active(device_ptr->station_ptr)) {
+      station_find_ap(device_ptr->station_ptr);
+      /* A blocking scan may finish after the grant expires. Never connect
+       * using that stale result; the controller stops scans on teardown. */
+      if (!station_task_stop && node_search_turn_is_valid() && station_found_ap(device_ptr->station_ptr))
+        station_connect(device_ptr->station_ptr);
+      else
+        vTaskDelay(pdMS_TO_TICKS(250));
     } else {
-      // Connected, sleep to reduce CPU usage
-      vTaskDelay(pdMS_TO_TICKS(10000));
+      vTaskDelay(pdMS_TO_TICKS(100));
     }
   }
 
@@ -214,32 +216,32 @@ static void device_connect_station_task(void* arg) {
 }
 
 void device_connect_station(DevicePtr device_ptr) {
-  // Kill old STA task if it exists
+  /* Cooperative cancellation cannot strand a mutex held by an RPC. */
   if (station_task_handle != NULL) {
-    ESP_LOGI(LOGGING_TAG, "Killing previous STA connect task");
-    vTaskDelete(station_task_handle);
-    station_task_handle = NULL;
+    station_task_stop = true;
+    esp_wifi_scan_stop();
+    while (station_task_handle != NULL) vTaskDelay(pdMS_TO_TICKS(10));
   }
+  station_task_stop = false;
 
   // Create new STA connect task
-  xTaskCreatePinnedToCore(
+  BaseType_t started = xTaskCreatePinnedToCore(
     device_connect_station_task,
     "device_connect_station_task",
     TASK_DEVICE_STACK,
     device_ptr,
     TASK_DEVICE_PRIORITY,
-    &station_task_handle,
+    (TaskHandle_t *)&station_task_handle,
     TASK_DEVICE_CORE
   );
+  ESP_ERROR_CHECK(started == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
 }
 
 void device_disconnect_station(DevicePtr device_ptr) {
-  if (station_task_handle != NULL) {
-    ESP_LOGI(LOGGING_TAG, "Stopping STA connect task");
-    vTaskDelete(station_task_handle);
-    station_task_handle = NULL;
-  }
-
+  /* Wake a blocking scan before stopping the owner task. */
+  esp_wifi_scan_stop();
+  station_task_stop = true;
+  while (station_task_handle != NULL) vTaskDelay(pdMS_TO_TICKS(10));
   station_disconnect(device_ptr->station_ptr);
 }
 
@@ -273,18 +275,6 @@ bool device_send_wireless_message(DevicePtr device_ptr, const uint8_t *msg, uint
 
   if(device_ptr->mode == STATION){
     return client_send_message(msg, len);
-  }
-
-  return false;
-}
-
-bool device_is_point_to_point_message(DevicePtr device_ptr, uint32_t dst) {
-  if(device_ptr->mode == AP){
-    return ((dst & device_ptr->access_point_ptr->ap_mask) == device_ptr->access_point_ptr->ap_subnet);
-  }
-
-  if(device_ptr->mode == STATION){
-    return ((dst & device_ptr->station_ptr->sta_mask) == device_ptr->station_ptr->sta_subnet);
   }
 
   return false;
@@ -347,6 +337,12 @@ uint8_t device_get_channel(DevicePtr device_ptr) {
   }
 
   return 0;
+}
+
+void device_set_rssi_threshold(DevicePtr device_ptr, int8_t threshold) {
+  if (device_ptr && device_ptr->station_ptr &&
+      station_is_initialized(device_ptr->station_ptr))
+    station_set_rssi_threshold(device_ptr->station_ptr, threshold);
 }
 
 void device_set_max_tx_power(DevicePtr device_ptr, int8_t power) {

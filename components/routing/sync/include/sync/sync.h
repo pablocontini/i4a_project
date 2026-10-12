@@ -46,6 +46,11 @@ typedef struct sync {
     bool is_leader;
     sync_cs_callback_t critical_sections[RS_LAST_COMPONENT_ID];
     sync_impl_t *impl;
+    mutex_t state_lock;
+    uint32_t session;
+    uint32_t completed[RS_LAST_COMPONENT_ID];
+    uint32_t active_sequence[RS_LAST_COMPONENT_ID];
+    bool deferred[RS_LAST_COMPONENT_ID];
     union {
         sync_leader_t leader;
     } _st;
@@ -76,6 +81,9 @@ void sync_register_critical_section(sync_t *self, component_id_t cs_id, sync_cs_
  * issue a new token to the SPI ring.
  */
 void sync_request_critical_section(sync_t *self, component_id_t cs_id);
+/* Retry the same circulation, never manufacture a second outstanding token. */
+void sync_on_tick(sync_t *self);
+void sync_defer_completion(sync_t *self, component_id_t cs_id);
 
 /**
  * Returns true if the current device is currently inside the critical

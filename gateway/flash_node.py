@@ -111,13 +111,22 @@ def boot_recovery_pending(reply):
     return len(reply.data) >= 51 and bool(reply.data[50])
 
 
+def boot_application_ready(reply):
+    return len(reply.data) < 53 or bool(reply.data[51])
+
+
+def boot_traffic_paused(reply):
+    return len(reply.data) >= 53 and bool(reply.data[52])
+
+
 def format_status(reply):
-    if len(reply.data) not in (50, 51):
+    if len(reply.data) not in (50, 51, 53):
         raise UpdateError("Unsupported INFO response")
     capacity, address = struct.unpack_from("<II", reply.data, 5)
     return (f"{role_names(1 << reply.sender)}: phase={reply.data[4]}, slot={capacity}, "
             f"running=0x{address:x}, pending_verify={reply.data[49]}, "
             f"recovery_pending={int(boot_recovery_pending(reply))}, "
+            f"ready={int(boot_application_ready(reply))}, boot_paused={int(boot_traffic_paused(reply))}, "
             f"session={struct.unpack_from('<I', reply.data, 45)[0]}, "
             f"elf_sha256={reply.data[13:45].hex()}")
 
@@ -238,6 +247,10 @@ class NodeUpdater:
                         reasons.append(f"phase={reply.data[4]}")
                     if reply.data[13:45] != expected_hash:
                         reasons.append("ELF hash mismatch")
+                    if not boot_application_ready(reply):
+                        reasons.append("ready=0")
+                    if boot_traffic_paused(reply):
+                        reasons.append("boot_paused=1 (waiting for ring startup barrier)")
                     if reply.data[49]:
                         reasons.append("pending_verify=1")
                     if boot_recovery_pending(reply):
@@ -278,7 +291,8 @@ class NodeUpdater:
             capacity = struct.unpack_from("<I", reply.data, 5)[0]
             if capacity < len(image):
                 raise UpdateError(f"{role_names(1 << role)}: OTA slot {capacity} bytes, image {len(image)} bytes")
-            if reply.data[4] != IDLE or reply.data[49] or boot_recovery_pending(reply):
+            if (reply.data[4] != IDLE or reply.data[49] or boot_recovery_pending(reply) or
+                    not boot_application_ready(reply) or boot_traffic_paused(reply)):
                 raise UpdateError(f"{role_names(1 << role)} is busy or boot is unconfirmed/recovering. "
                                   "Wait for automatic recovery and inspect --status before retrying")
         self.report(f"Uploading {len(image)} bytes to {role_names(self.roles)}")
@@ -324,6 +338,10 @@ class NodeUpdater:
 
 
 def main():
+    # Serial diagnostics may contain replacement characters or partial boot text.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True, help="Center USB-UART, e.g. COM3 or /dev/ttyUSB0")
     parser.add_argument("--roles", required=True, type=parse_roles,

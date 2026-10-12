@@ -356,4 +356,13 @@ CTRL + ]
 - [Software architecture](docs/software.md), [repository overview](auxiliar/contexto_repo.md).
 - [Imported stability changes and validation](docs/comnetar-integration.md).
 - [One link per pair of nodes: admission, compatibility and tests](docs/neighbor-link-protection.md).
+- [Coordinated redundant-link discovery, RSSI portal and three-node validation](docs/redundant-link-discovery.md).
 - [Historical September 2026 debugging report](docs/informe-depuracion-reinicios-2026-09.md).
+
+## Estado del banco de pruebas (12 de octubre de 2026)
+
+- [Avances, imágenes activas, límites de validación y pendientes](docs/continuidad-proyecto-20261012.md).
+- [Evidencias portables de recuperación y carga](docs/evidencia/20261012/README.md).
+- [Comparación experimental de buffers SPI, sin modificar hardware ni reloj](docs/manejo-buffers-spi-20261012.md).
+
+La recuperación se comprobó en cuatro cortes individuales. La degradación con carga simultánea sigue en investigación; no se demostró mejora de velocidad por aumentar buffers. Los perfiles rápidos y las reservas son opciones de laboratorio, no valores de producción.

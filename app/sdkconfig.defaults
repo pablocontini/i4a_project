@@ -1,0 +1,2 @@
+# Android captive portal and Chrome login requests exceed the 512-byte default.
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=2048

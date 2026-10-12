@@ -2,6 +2,7 @@
 #include "routing_hooks.h"
 #include "esp_log.h"
 #include "lwip/netif.h"
+#include "ip_diagnostics.h"
 
 static const char *TAG = "ROUTING";
 
@@ -16,6 +17,24 @@ static struct netif *routing_hook_home(uint32_t src_ip, uint32_t dst_ip);
 static struct netif *routing_hook_default(uint32_t src_ip, uint32_t dst_ip);
 static struct netif *routing_hook_custom(uint32_t src_ip, uint32_t dst_ip);
 static struct netif *routing_hook_wifi_netif_default(uint32_t src_ip, uint32_t dst_ip);
+
+static err_t discard_unroutable_ipv4(struct netif *netif, struct pbuf *packet,
+                                  const ip4_addr_t *destination) {
+    (void)netif;
+    (void)packet;
+    (void)destination;
+    return ERR_RTE;
+}
+
+// Returning NULL from LWIP_HOOK_IP4_ROUTE_SRC allows lwIP's default-interface
+// fallback. An explicit sink prevents packets circulating through SPI while
+// the gateway is unavailable. lwIP retains ownership of the pbuf.
+static struct netif no_route_netif = {
+    .name = {'n', 'r'},
+    .mtu = 1500,
+    .flags = NETIF_FLAG_UP | NETIF_FLAG_LINK_UP,
+    .output = discard_unroutable_ipv4,
+};
 
 static routing_hook_func_t selected_routing_hook = routing_hook_default;
 
@@ -45,7 +64,8 @@ static struct netif *routing_hook_root_center(uint32_t src_ip, uint32_t dst_ip) 
 
     if (node_is_point_to_point_message(dst_ip)) {
         ESP_LOGD(TAG, "Decision: point-to-point message -> use WIFI netif");
-        return ready_netif(node_get_wifi_netif());
+        struct netif *wifi = ready_netif(node_get_wifi_netif());
+        return wifi ? wifi : &no_route_netif;
     }
 
     if (node_is_packet_for_this_subnet(dst_ip)) {
@@ -62,19 +82,25 @@ static struct netif *routing_hook_forwarder(uint32_t src_ip, uint32_t dst_ip) {
 
     if (node_is_point_to_point_message(dst_ip)) {
         ESP_LOGD(TAG, "Decision: point-to-point message -> use WIFI netif");
-        return ready_netif(node_get_wifi_netif());
+        struct netif *wifi = ready_netif(node_get_wifi_netif());
+        return wifi ? wifi : &no_route_netif;
     }
 
     rt_routing_result_t routing_result = rt_do_route(rt, src_ip, dst_ip);
 
+    if (routing_result == ROUTE_NONE)
+        return &no_route_netif;
+
     if (routing_result == ROUTE_WIFI) {
         ESP_LOGD(TAG, "Decision: routing result -> ROUTE_WIFI -> use WIFI netif");
-        return ready_netif(node_get_wifi_netif());
+        struct netif *wifi = ready_netif(node_get_wifi_netif());
+        return wifi ? wifi : &no_route_netif;
     }
 
     if (routing_result == ROUTE_SPI) {
         ESP_LOGD(TAG, "Decision: routing result -> ROUTE_SPI -> use SPI netif");
-        return ready_netif(node_get_spi_netif());
+        struct netif *spi = ready_netif(node_get_spi_netif());
+        return spi ? spi : &no_route_netif;
     }
 
     ESP_LOGD(TAG, "Decision: routing result -> unknown -> returning NULL");
@@ -149,7 +175,14 @@ void node_register_custom_routing_hook(routing_hook_func_t hook) {
 
 struct netif *node_do_routing(uint32_t src, uint32_t dst) {
     ESP_LOGD(TAG, "node_do_routing called");
-    return selected_routing_hook(src, dst);
+    struct netif *result = selected_routing_hook(src, dst);
+    ip_diag_route_t decision = IP_DIAG_ROUTE_OTHER;
+    if (!result) decision = IP_DIAG_ROUTE_FALLBACK;
+    else if (result == &no_route_netif) decision = IP_DIAG_ROUTE_SINK;
+    else if (result == ready_netif(node_get_spi_netif())) decision = IP_DIAG_ROUTE_SPI;
+    else if (result == ready_netif(node_get_wifi_netif())) decision = IP_DIAG_ROUTE_WIFI;
+    ip_diag_route(src, dst, decision);
+    return result;
 }
 
 routing_t *node_get_rt_instance(void) {

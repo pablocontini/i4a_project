@@ -1,0 +1,43 @@
+{
+  "node": "grillo",
+  "port": "COM8",
+  "version": "dev-p2pfix-20261012-grillo",
+  "expected_elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+  "roles": {
+    "north": {
+      "elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "south": {
+      "elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "east": {
+      "elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "west": {
+      "elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    },
+    "center": {
+      "elf_sha256": "bbe9501d964d91bbbcfebec692f1164b9bf8a0630c26c62b4b1785726ba2d4af",
+      "ready": 1,
+      "boot_paused": 0,
+      "pending_verify": 0,
+      "recovery_pending": 0
+    }
+  }
+}

@@ -63,6 +63,35 @@ admitir el enlace. Los eventos de conexión, mensajes y desconexión se procesan
 en una cola FIFO común. El primer handshake de ruteo del AP se procesa en la
 Station antes de su respuesta, conservando el orden de aprovisionamiento.
 
+## Convivencia con OTA
+
+El centro procesa las solicitudes del gestor de vecinos en una tarea propia,
+con una cola de 16 mensajes. El callback compartido del anillo copia y encola
+la solicitud sin esperar un broadcast. La tarea aplica las operaciones en orden,
+genera la copia del registro y la transmite fuera del callback. El ruteo también
+encola sus pedidos de expiración; la tarea verifica vencimientos al quedar
+inactiva, aunque no llegue un tick.
+
+Esto evita que una respuesta de vecinos esperando el bloqueo de broadcast
+detenga la tarea que entrega los ACK OTA. Las reservas y renovaciones siguen
+activas durante la carga. Si la cola se llena, la solicitud se descarta sin
+bloquear el anillo; el emisor conserva su mecanismo de timeout y no admite ni
+renueva un enlace sin confirmación. Las revisiones y las duraciones se generan
+cuando la tarea procesa la solicitud, para evitar enviar una copia envejecida
+por una espera en cola.
+
+La UART del centro imprime `I4ANM` cuando un broadcast de vecinos falla, demora
+al menos 250 ms o se detectan descartes de la cola. En `snapshot_failed` y
+`snapshot_slow`, `value` es el tiempo del broadcast en milisegundos; en
+`queue_full`, es el contador acumulado de solicitudes descartadas. Estas líneas
+se conservan con `gateway/flash_node.py --verbose` y usan el mismo bloqueo de
+salida que los ACK OTA.
+
+Las pruebas nativas verifican que el callback no transmita ni espere, incluso
+con la cola llena, y que la tarea conserve la admisión, renovación, liberación
+y expiración. La carga OTA con vecinos conectados requiere una nueva prueba
+física; las pruebas simuladas no garantizan la continuidad SPI durante flash.
+
 ## Compatibilidad y actualización
 
 Al cerrar una interfaz se detienen sus tareas TCP antes de destruir la interfaz
@@ -89,7 +118,7 @@ python tests/run_native_neighbors.py --cc cc
 idf.py -C app build
 ```
 
-En Windows, pasar la ruta de TinyCC a `--cc`. Las 14 pruebas nuevas ejecutan el
+En Windows, pasar la ruta de TinyCC a `--cc`. Las 21 pruebas ejecutan el
 código C real del registro, coordinador SPI, transporte, filtro de escaneo y cola
 de eventos con proveedores simulados. Cubren enlaces recíprocos, terceros
 vecinos, intercalaciones de intentos simultáneos, vencimiento y renovación,
@@ -101,3 +130,20 @@ A→B seguido de B→A en otras orientaciones, dos intentos simultáneos, pérdi
 recuperación de SPI/Wi-Fi, reconexión tras reiniciar un nodo y enlaces válidos
 A→C/B→C. Comprobar que el cambio AP/Station libera sockets y reservas y que una
 asociación rechazada no incorpora rutas.
+
+
+Durante OTA, las reservas usan el reloj local congelado de ring_share: mantienen
+el tiempo restante hasta el aborto, vencimiento de la sesion o reinicio. Las
+renovaciones de conexiones activas se resuelven localmente y las nuevas admisiones
+se rechazan. La pausa tambien bloquea trafico IP en el transporte inferior. Los
+pedidos duplicados del mismo propietario se coalescen antes de ocupar la cola;
+las retransmisiones identicas no generan nuevas revisiones ni mas snapshots.
+Ver `docs/actualizacion_firmware.md` para instalacion y diagnosticos de la pausa.
+
+
+La pausa de arranque bloquea vecinos/IP desde antes de inicializar SPI. Se mantiene
+hasta que el centro comprueba las cinco aplicaciones listas, con la misma imagen,
+confirmadas y fuera de recuperacion. RESET y aprovisionamiento siguen habilitados.
+La suite incluye la barrera y una simulacion de ocho recepciones DMA acumuladas
+mientras la tarea de polling no corre; tambien comprueba el descarte de tramas
+truncadas y que no se reutilicen buffers aun en poder del driver.

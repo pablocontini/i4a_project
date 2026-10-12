@@ -30,4 +30,13 @@ menu "Internet for all: SPI Configuration"
         range 200 1600
         default 1600
 
+    config SPI_RX_EXTRA_BUFFERS
+        int "Additional SPI RX buffers for deferred consumers"
+        range 0 16
+        default 0
+        help
+            Keep eight DMA transactions armed while completed frames are held
+            by consumer tasks. Each extra buffer uses SPI_BUFFER_SIZE bytes.
+            Experimental software control; does not change wire format or clock.
+
 endmenu

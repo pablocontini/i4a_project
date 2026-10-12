@@ -6,8 +6,13 @@
 
 /* Register before starting the ring. Call on every board, using its GPIO role. */
 esp_err_t node_ota_init(ring_share_t *ring, uint8_t role);
-/* Only the center opens UART0; call once node_setup has finished. */
+/* Call on every board after application setup and successful boot confirmation.
+ * Marks application ready; BEGIN remains blocked until the center checks all
+ * five confirmed boards and releases the startup gate. Only the center opens UART0. */
 esp_err_t node_ota_start_serial(void);
+typedef esp_err_t (*node_radio_cut_fn)(uint32_t seconds);
+/* Called from the worker, never the SPI callback. ACK means queued, not applied. */
+void node_ota_register_radio_cut(node_radio_cut_fn handler);
 
 typedef void (*node_ota_reply_fn)(const node_ota_packet_t *reply, void *context);
 /* Transport-neutral coordinator entry point. Serializes callers, waits for all

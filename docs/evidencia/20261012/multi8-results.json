@@ -1,0 +1,119 @@
+[
+  {
+    "phase": "both",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 3996020,
+        "elapsed_s": 90.0,
+        "mbps": 0.3552017777777777,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4600460,
+        "elapsed_s": 90.0,
+        "mbps": 0.4089297777777777,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4782960,
+        "elapsed_s": 90.0,
+        "mbps": 0.425152,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4384380,
+        "elapsed_s": 90.0,
+        "mbps": 0.38972266666666666,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 2190000,
+        "elapsed_s": 90.01500000001397,
+        "mbps": 0.19463422762869834,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 2302420,
+        "elapsed_s": 90.0,
+        "mbps": 0.20465955555555557,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 1754920,
+        "elapsed_s": 90.01500000001397,
+        "mbps": 0.1559668944064636,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 1794175,
+        "elapsed_s": 90.0,
+        "mbps": 0.15948222222222222,
+        "completed_downloads": 0,
+        "errors": [
+          {
+            "time": "2026-10-12T10:43:41.415941-03:00",
+            "error": "timed out",
+            "stage": "response_body"
+          }
+        ],
+        "worker": 3
+      }
+    ],
+    "summary": [
+      {
+        "node": "ramona",
+        "connections": 4,
+        "bytes": 17763820,
+        "mbps": 1.5790062222222223,
+        "errors": 0,
+        "completed_downloads": 0
+      },
+      {
+        "node": "grillo",
+        "connections": 4,
+        "bytes": 8041515,
+        "mbps": 0.7146822196299507,
+        "errors": 1,
+        "completed_downloads": 0
+      }
+    ]
+  }
+]

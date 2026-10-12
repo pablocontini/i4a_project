@@ -9,6 +9,8 @@
 #include "peer_session.h"
 #include "channel_manager/channel_manager.h"
 #include "node.h"
+#include "routing/impl.h"
+#include <string.h>
 #include <fcntl.h>
 #include <errno.h>
 
@@ -58,22 +60,44 @@ static bool socket_read_loop(int sock, uint32_t net, uint32_t mask) {
     bool connected = false;
     bool admitted = peer_session_open(&session, sock, true, node_get_link_name());
     if (admitted && sta_is_up) {
-        /* Channel provisioning only follows admission. */
-        cm_provide_to_siblings(node_get_device_channel(), node_get_link_name());
+        /* Routing admission follows the offered logical network, not DHCP. */
         uint8_t buffer[PEER_SESSION_MAX_MESSAGE];
         while (sta_is_up) {
             int len = peer_session_receive(&session, buffer, sizeof(buffer));
             if (len <= 0) break;
-            /* The first AP handshake provisions the STA before it replies. */
-            node_on_peer_message(buffer, len);
             if (!connected) {
+                rt_peer_event_t hello;
+                if (len != sizeof(hello)) { admitted = false; break; }
+                memcpy(&hello, buffer, sizeof(hello));
+                if (hello.event_id != PEER_HANDSHAKE || hello.payload.handshake.dtr == 0 ||
+                    hello.payload.handshake.dtr == UINT32_MAX ||
+                    !node_accept_peer_offer(hello.payload.handshake.provided_network.addr,
+                                            hello.payload.handshake.provided_network.mask)) {
+                    admitted = false;
+                    node_link_trace("event=handshake_rejected event_id=%u dtr=%lu", (unsigned)hello.event_id,
+                                    (unsigned long)hello.payload.handshake.dtr);
+                    ESP_LOGW(LOGGING_TAG, "Offered subnet rejected; keeping the node allocation");
+                    break;
+                }
+                /* FIFO processes the AP provision before our own handshake. */
+                node_on_peer_message(buffer, len);
+                node_set_peer_offer_accepted(true);
+                cm_provide_to_siblings(node_get_device_channel(), node_get_link_name());
                 node_on_peer_connected(net, mask, PEER_CLIENT);
                 connected = true;
+                node_link_trace("event=peer_admitted transport=%08lx/%08lx", (unsigned long)net, (unsigned long)mask);
+                node_link_trace_ips("admitted_transport");
+            } else {
+                node_on_peer_message(buffer, len);
             }
         }
     }
+    node_set_peer_offer_accepted(false);
     peer_session_close(&session);
-    if (connected) node_on_peer_lost(net, mask, PEER_CLIENT);
+    if (connected) {
+        node_link_trace("event=peer_lost transport=%08lx/%08lx", (unsigned long)net, (unsigned long)mask);
+        node_on_peer_lost(net, mask, PEER_CLIENT);
+    }
     return admitted;
 }
 

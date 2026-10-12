@@ -1,0 +1,27 @@
+[
+  {
+    "phase": "both",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 32578536,
+        "elapsed_s": 180.0,
+        "mbps": 1.4479349333333333,
+        "completed_downloads": 3,
+        "errors": []
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 19997976,
+        "elapsed_s": 180.01500000001397,
+        "mbps": 0.8887248729271872,
+        "completed_downloads": 2,
+        "errors": []
+      }
+    ]
+  }
+]

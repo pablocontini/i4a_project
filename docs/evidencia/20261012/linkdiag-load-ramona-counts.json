@@ -1,0 +1,562 @@
+[
+  {
+    "time": "2026-10-12T14:50:52.536237-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250649",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116076",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:50:52.553047-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:50:57.535303-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250665",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116091",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:50:57.551921-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:03.533217-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250682",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116107",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:03.549876-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:09.531609-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250707",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116131",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:09.548495-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:14.541574-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250723",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116147",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:14.553526-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:20.561860-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250743",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116167",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:20.561860-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:26.542546-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250760",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116185",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:26.553156-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:31.542796-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250778",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116202",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:31.553758-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:37.540546-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250793",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116217",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:37.540546-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:42.542775-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250810",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116234",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:42.553775-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:47.537976-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250824",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116248",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:47.554031-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:53.536241-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250838",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116262",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:53.552824-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:59.534603-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "250856",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116280",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:51:59.553814-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2427",
+    "crc_ip": "2356",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:05.565718-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "251286",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116515",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:05.566284-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2430",
+    "crc_ip": "2359",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:11.532503-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "251995",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "116886",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:11.554653-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2431",
+    "crc_ip": "2360",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:17.529603-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "252599",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "117212",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:17.554645-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2436",
+    "crc_ip": "2364",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:22.543885-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "253181",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "117530",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:22.554448-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2438",
+    "crc_ip": "2366",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:27.544053-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "253765",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "117888",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:27.555058-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2440",
+    "crc_ip": "2368",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:32.543702-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "254533",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "118286",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:32.554697-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2442",
+    "crc_ip": "2370",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:38.544025-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "255256",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "118684",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:38.555025-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2445",
+    "crc_ip": "2373",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:43.543659-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "255875",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "119007",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:43.555253-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2447",
+    "crc_ip": "2374",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:48.542425-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "256715",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "119480",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:48.555938-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2455",
+    "crc_ip": "2382",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:53.536433-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "257511",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "119914",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:53.555565-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2461",
+    "crc_ip": "2388",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:58.543865-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "258269",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "120321",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:52:58.554710-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2466",
+    "crc_ip": "2392",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:04.533381-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "258832",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "120625",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:04.555554-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2467",
+    "crc_ip": "2393",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:09.531965-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "258847",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "120640",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:09.548981-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2467",
+    "crc_ip": "2393",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:14.530592-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "258864",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "120657",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:14.555808-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2467",
+    "crc_ip": "2393",
+    "unknown": "0",
+    "dispatch_full": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:19.544763-03:00",
+    "event": "spi_counts",
+    "board_id": "4",
+    "rx": "258880",
+    "short": "0",
+    "rx_full": "0",
+    "free_fail": "0",
+    "tx": "120673",
+    "tx_fail": "0"
+  },
+  {
+    "time": "2026-10-12T14:53:19.555429-03:00",
+    "event": "drop_counts",
+    "board_id": "4",
+    "crc": "2467",
+    "crc_ip": "2393",
+    "unknown": "0",
+    "dispatch_full": "0"
+  }
+]

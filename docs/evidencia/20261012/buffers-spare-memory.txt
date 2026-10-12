@@ -1,0 +1,8 @@
+.iram0.vectors            1027   1074266112
+.iram0.text             105035   1074267140
+.dram0.data              42264   1073414144
+.dram0.bss               31824   1073456408
+.iram0.text_end              1   1074372175
+.iram0.data                  0   1074372176
+.iram0.bss                   0   1074372176
+.dram0.heap_start            0   1073488232

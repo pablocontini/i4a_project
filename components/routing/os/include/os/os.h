@@ -15,6 +15,8 @@ typedef void *mutex_t;
 
 bool mutex_create(mutex_t *m);
 bool mutex_lock(mutex_t *m);
+/* Never wait: diagnostics can skip a snapshot while a writer owns the lock. */
+bool mutex_try_lock(mutex_t *m);
 bool mutex_unlock(mutex_t *m);
 void mutex_destroy(mutex_t *m);
 
@@ -66,5 +68,10 @@ void os_log(os_log_level_t level, const char *tag, const char *fmt, ...);
  */
 
 void os_delay_ms(uint32_t milliseconds);
+uint64_t os_monotonic_ms(void);
+uint32_t os_random_u32(void);
+/* Bounded, nonblocking diagnostic enqueue; initialize once before ring callbacks. */
+bool os_diagnostics_start(void);
+void os_diag(const char *tag, const char *fmt, ...);
 
 #endif  // _I4A_OS_H_

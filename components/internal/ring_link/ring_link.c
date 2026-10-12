@@ -2,6 +2,10 @@
 #include "freertos/queue.h"
 #include "task_config.h"
 #include "ring_link.h"
+#include "link_diagnostics.h"
+#ifdef CONFIG_RING_LINK_LOWLEVEL_IMPL_SPI
+#include "spi.h"
+#endif
 
 static const char *TAG = "==> ring_link";
 
@@ -14,7 +18,12 @@ static esp_err_t process_payload(ring_link_payload_t *p)
     QueueHandle_t *specific_queue;
 
     uint32_t expected = ring_link_compute_crc32(p);
+#ifdef CONFIG_RING_LINK_LOWLEVEL_IMPL_SPI
+    if(spi_rx_buffer_changed(p,expected))ld_count(LD_RX_CHANGED);
+#endif
     if (expected != p->crc32) {
+        ld_count(LD_CRC);
+        if(ring_link_payload_is_esp_netif(p))ld_count(LD_CRC_IP);
         ESP_LOGD(TAG, "CRC32 mismatch, dropping.");
         ring_link_lowlevel_free_rx_buffer(p);
         return ESP_FAIL;
@@ -32,11 +41,13 @@ static esp_err_t process_payload(ring_link_payload_t *p)
     }
     else
     {
+        ld_count(LD_UNKNOWN);
         ESP_LOGD(TAG, "Unknown payload type: '0x%02x'", p->buffer_type);
         ring_link_lowlevel_free_rx_buffer(p);
         return ESP_FAIL;
     }
     if (xQueueSend(*specific_queue, &p, pdMS_TO_TICKS(100)) != pdTRUE) {
+        ld_count(LD_DISPATCH_FULL);
         ESP_LOGW(TAG, "Queue full, payload dropped");
         ring_link_lowlevel_free_rx_buffer(p);
         return ESP_FAIL;

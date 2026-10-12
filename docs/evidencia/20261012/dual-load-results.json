@@ -1,0 +1,67 @@
+[
+  {
+    "phase": "ramona_only",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4093840,
+        "elapsed_s": 20.030999999959022,
+        "mbps": 1.6350017472950427,
+        "completed_downloads": 0,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "phase": "grillo_only",
+    "results": [
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 4962540,
+        "elapsed_s": 20.0,
+        "mbps": 1.985016,
+        "completed_downloads": 0,
+        "errors": []
+      }
+    ]
+  },
+  {
+    "phase": "both",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 2821760,
+        "elapsed_s": 20.25,
+        "mbps": 1.1147693827160494,
+        "completed_downloads": 0,
+        "errors": [
+          {
+            "time": "2026-10-12T10:19:36.546094-03:00",
+            "error": "timed out"
+          }
+        ]
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 2561716,
+        "elapsed_s": 20.20300000003772,
+        "mbps": 1.0143903380667099,
+        "completed_downloads": 0,
+        "errors": [
+          {
+            "time": "2026-10-12T10:19:36.493986-03:00",
+            "error": "timed out"
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,114 @@
+[
+  {
+    "phase": "both",
+    "results": [
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 3781400,
+        "elapsed_s": 90.06199999997625,
+        "mbps": 0.33589305145353177,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4313880,
+        "elapsed_s": 90.06199999997625,
+        "mbps": 0.38319202327295754,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4967540,
+        "elapsed_s": 90.06199999997625,
+        "mbps": 0.4412551353513189,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "ramona",
+        "source": "10.116.0.2",
+        "ifindex": 25,
+        "bytes": 4261410,
+        "elapsed_s": 90.0,
+        "mbps": 0.378792,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 1592440,
+        "elapsed_s": 90.0,
+        "mbps": 0.14155022222222222,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 0
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 1378240,
+        "elapsed_s": 90.0,
+        "mbps": 0.12251022222222221,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 1
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 1468760,
+        "elapsed_s": 90.07799999997951,
+        "mbps": 0.1304433935034378,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 2
+      },
+      {
+        "node": "grillo",
+        "source": "10.148.0.4",
+        "ifindex": 6,
+        "bytes": 874375,
+        "elapsed_s": 90.0,
+        "mbps": 0.07772222222222222,
+        "completed_downloads": 0,
+        "errors": [],
+        "worker": 3
+      }
+    ],
+    "summary": [
+      {
+        "node": "ramona",
+        "connections": 4,
+        "bytes": 17324230,
+        "mbps": 1.5388714441166813,
+        "errors": 0,
+        "completed_downloads": 0
+      },
+      {
+        "node": "grillo",
+        "connections": 4,
+        "bytes": 5313815,
+        "mbps": 0.47193010502020105,
+        "errors": 0,
+        "completed_downloads": 0
+      }
+    ],
+    "timeout_s": 10.0
+  }
+]

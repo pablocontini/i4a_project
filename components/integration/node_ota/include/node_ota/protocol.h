@@ -23,6 +23,8 @@ enum node_ota_op {
     NODE_OTA_SELECT,
     NODE_OTA_ABORT,
     NODE_OTA_REBOOT,
+    /* 8 is reserved for internal boot resume. USB-only diagnostic, seconds u32. */
+    NODE_OTA_RADIO_CUT = 9,
 };
 
 enum node_ota_phase {

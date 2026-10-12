@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #define MAX_ROUTING_ENTRIES 16
+#define ROUTING_OUTPUT_NONE UINT8_MAX
 
 /**
  * The routing_entry and routing_table structure will be shared
@@ -60,9 +61,8 @@ void routing_table_init(rt_routing_table_t *table, uint8_t default_gateway);
 void routing_table_add(rt_routing_table_t *table, uint32_t network, uint32_t mask, uint8_t output);
 
 /**
- * Removes all non-default routes with the specified output as destination.
- *
- * The default gateway will not be changed.
+ * Removes all routes with the specified output as destination, including
+ * the default gateway when it uses that output.
  */
 void routing_table_remove_by_output(rt_routing_table_t *table, uint8_t output);
 

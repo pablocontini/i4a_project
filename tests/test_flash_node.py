@@ -191,10 +191,43 @@ class UploadTests(unittest.TestCase):
                 self.updater(transport).update(image_bytes(), boot_timeout=24)
         self.assertEqual(clock.now, 24)
 
+    def test_boot_barrier_blocks_upload_until_ready_and_released(self):
+        for ready, paused in ((0, 0), (1, 1)):
+            with self.subTest(ready=ready, paused=paused):
+                transport = FakeNode()
+                original_send = transport.send
+                def send(request):
+                    original_send(request)
+                    transport.queue = [ota.Packet(p.op, p.targets, p.sender, p.session,
+                        p.sequence, p.offset, p.data + bytes((0, ready, paused)))
+                        for p in transport.queue]
+                transport.send = send
+                with self.assertRaisesRegex(ota.UpdateError, "busy or boot is unconfirmed"):
+                    self.updater(transport).update(image_bytes())
+                self.assertEqual([p.op for p in transport.sent], [ota.INFO])
+
+    def test_matching_firmware_with_boot_barrier_is_not_success(self):
+        transport = FakeNode()
+        original_send = transport.send
+        def send(request):
+            original_send(request)
+            transport.queue = [ota.Packet(p.op, p.targets, p.sender, p.session,
+                p.sequence, p.offset, p.data + bytes((0, 1, int(transport.booted))))
+                for p in transport.queue]
+        transport.send = send
+        clock = FakeClock()
+        with patch.object(ota.time, "monotonic", clock.monotonic), patch.object(ota.time, "sleep", clock.sleep):
+            with self.assertRaisesRegex(ota.UpdateError, "north: boot_paused=1"):
+                self.updater(transport).update(image_bytes(), boot_timeout=24)
+        self.assertEqual(clock.now, 24)
+
     @patch.object(ota.time, "sleep")
     def test_full_flow_verifies_boot_and_preserves_image(self, _sleep):
         transport = FakeNode()
-        self.updater(transport).update(image_bytes())
+        # This fault-free transport is synchronous; a 1 ms wall-clock deadline
+        # otherwise introduces spurious retries when the firmware build is busy.
+        with patch.object(ota.time, "monotonic", return_value=0):
+            self.updater(transport).update(image_bytes())
         ops = [p.op for p in transport.sent]
         self.assertLess(ops.index(ota.END), ops.index(ota.SELECT))
         self.assertLess(ops.index(ota.SELECT), ops.index(ota.REBOOT))

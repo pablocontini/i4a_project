@@ -13,6 +13,8 @@ bool nm_renew(const nm_link_id_t *link);
 void nm_release(const nm_link_id_t *link);
 bool nm_owns(const nm_link_id_t *link);
 bool nm_is_blocked_uuid(const char *uuid);
+bool nm_is_radio_busy(uint8_t owner);
+bool nm_is_radio_active(uint8_t owner);
 void nm_tick(void);
 
 #endif

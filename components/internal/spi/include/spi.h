@@ -2,6 +2,7 @@
 
 // C libraries
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -59,3 +60,5 @@ esp_err_t spi_free_rx_buffer(void *p);
 }
 #endif
 
+
+bool spi_rx_buffer_changed(const void *p, uint32_t computed_crc);

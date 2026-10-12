@@ -17,11 +17,21 @@ def main():
     build.mkdir(parents=True, exist_ok=True)
     component = ROOT / "components/integration/neighbor_manager"
     suites = {
+        "spi": ("test_spi_keeps_dma_receives_queued_and_drops_truncated_frames",
+                "test_spi_delayed_consumer_retains_ownership",
+                "test_spi_crc_at_completion_is_distinct_from_buffer_mutation"),
+        "lowlevel": ("test_lowlevel_pauses_ip_and_preserves_internal_forwarding",
+                     "test_lowlevel_diagnostics_distinguish_gate_drop_and_tx_failure"),
+        "ring": ("test_ring_maintenance_admission_and_clock",
+                 "test_boot_gate_preserves_provisioning_and_ota_lease_pause"),
         "registry": ("test_symmetry_and_other_neighbors", "test_pending_tie_break_and_confirmed_priority",
                      "test_expiry_renewal_and_stale_sessions", "test_identity_validation",
                      "test_all_simultaneous_endpoint_orders"),
         "manager": ("test_spi_reservations_snapshots_and_release", "test_spi_loss_expiry_and_stale_cleanup",
-                    "test_spi_incoming_identity_and_invalid_owner"),
+                    "test_spi_incoming_identity_and_invalid_owner",
+                    "test_neighbor_callback_defers_broadcast_and_handles_full_queue",
+                    "test_neighbor_worker_failure_and_idle_expiry",
+                    "test_neighbor_duplicate_requests_and_frozen_leases"),
         "session": ("test_identity_admission_both_roles_and_framing", "test_duplicate_and_lost_reservation_never_admit",
                     "test_incompatible_identity_and_incomplete_frames", "test_expired_or_unrenewed_session_stops_transport"),
         "channel": ("test_scan_cooldown_and_channel_independence",),
@@ -35,8 +45,13 @@ def main():
         if sys.platform.startswith("linux"):
             # Socket providers in this library must take precedence over libc.
             command += ["-Wl,-Bsymbolic"]
+        if suite == "spi":
+            command += ["-include", str(ROOT / "tests/native/routing/mocks/compiler.h"), "-I", str(ROOT / "tests/native/spi/mocks"), "-I", str(ROOT / "components/internal/link_diagnostics/include")]
+        if suite == "ring":
+            command += ["-I", str(ROOT / "components/routing/ring_share/include")]
         for include in (component / "include", ROOT / "tests/native/neighbors/mocks", ROOT / "tests/native/mocks",
-                        ROOT / "components/routing/os/include", ROOT / "components/wireless/peer_session/include"):
+                        ROOT / "components/routing/os/include", ROOT / "components/wireless/peer_session/include",
+                        ROOT / "components/internal/ip_diagnostics/include"):
             command += ["-I", str(include)]
         for include in ("integration/channel_manager/include", "integration/callbacks",
                         "routing/wireless/include", "routing/siblings/include"):

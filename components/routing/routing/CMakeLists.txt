@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/routing.c"
+        "src/routing_diagnostics.c"
         "src/forwarder/forwarder.c"
         "src/forwarder/peer.c"
         "src/forwarder/sibling.c"

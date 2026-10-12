@@ -89,13 +89,14 @@ typedef struct rt_forwarder_state {
     } global_state;
 
     /**
-     * Distance to the root node through the current gateway.
-     *
-     * This distance is measured in the number of _nodes_ that
-     * a packet needs to jump though in order to get to the root
-     * node.
+     * Distance to the root through the current gateway. The root has DTR 1;
+     * each wireless node-to-node hop adds one. All SPI siblings of a node
+     * share the same DTR. Zero means that no gateway is currently known.
      */
     uint32_t dtr;
+    /** Retry the same gateway request without changing the node's subnet. */
+    uint32_t gateway_retry_timeout;
+    network_t gateway_request_path[16];
 } rt_forwarder_state_t;
 
 typedef struct rt_peer_handshake {
@@ -173,6 +174,7 @@ typedef struct rt_peer_event {
 typedef struct rt_role_impl {
     void (*on_start)(struct routing *self);
     void (*on_tick)(struct routing *self, uint32_t dt_ms);
+    bool (*tick_needed)(struct routing *self);
     void (*on_peer_connected)(struct routing *self, const network_t *conn);
     void (*on_peer_handshake)(struct routing *self, const rt_peer_handshake_t *event);
     void (*on_peer_update_dtr)(struct routing *self, const rt_peer_update_dtr_t *event);

@@ -20,11 +20,13 @@ typedef struct __attribute__((packed)) {
     uint64_t rx_bytes;
     uint64_t tx_bytes;
     int8_t rssi;
+    uint8_t peer_admitted;
 } im_ring_packet_t;
 
 typedef struct {
     im_ring_packet_t ring[MAX_ORIENTATIONS];
     ring_share_t *rs;
+    int64_t received_us[MAX_ORIENTATIONS];
 } im_manager_t;
 
 void im_init(ring_share_t *rs);

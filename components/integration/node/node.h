@@ -20,6 +20,10 @@ typedef enum {
 
 // Startup
 void node_setup(void); // Always call this before doing anything with this module
+void node_set_orientation_mode_requested(bool enabled);
+bool node_is_orientation_mode_enabled(void);
+void node_set_configuration_mode_requested(bool enabled);
+bool node_is_configuration_mode_enabled(void);
 
 // Device mode setting
 void node_set_as_ap(uint32_t network, uint32_t mask); // Sets device as AP with desired subnet/mask
@@ -36,6 +40,19 @@ bool node_is_sta_locked(void); // Returns whether the STA interface is enabled o
 bool node_is_ap_locked(void); // Returns whether the AP interface is enabled or not
 bool node_is_device_apsta(void); // Returns whether the device is on AP+STA mode or not
 bool node_is_network_provided(void); // Returns whether the device has been assigned a network address or not
+
+/* Only the owner of the center-granted, bounded turn may scan or connect. */
+bool node_acquire_search_turn(void);
+bool node_search_turn_is_valid(void);
+void node_release_search_turn(void);
+bool node_has_active_wireless_peer(void);
+void node_set_peer_offer_accepted(bool accepted);
+bool node_accept_peer_offer(uint32_t offered_subnet, uint32_t offered_mask);
+/* Startup barrier for app_main only; never wait from an SPI callback. */
+bool node_wait_wifi_started(uint32_t timeout_ms);
+/* Sparse UART diagnostics independent of the normal IDF log level. No credentials. */
+void node_link_trace(const char *format, ...);
+void node_link_trace_ips(const char *event);
 
 // Node parameters
 node_device_orientation_t node_get_device_orientation(void); // Orientation of node's specific device

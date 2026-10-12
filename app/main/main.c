@@ -1,3 +1,4 @@
+#include "link_diagnostics.h"
 #include "esp_log.h"
 #include <inttypes.h>
 #include "lwip/esp_netif_net_stack.h"
@@ -17,6 +18,9 @@
 #include "node.h"
 #include "node_ota/node_ota.h"
 #include "neighbor_manager/neighbor_manager.h"
+#include "discovery_manager/discovery_manager.h"
+#include "antenna_orientation_mode/antenna_orientation_mode.h"
+#include "config_portal/config_portal.h"
 
 #define ROOT_NETWORK 0x0A000000  // 10.0.0.0
 #define ROOT_MASK 0xFF000000 // 255.0.0.0
@@ -47,19 +51,22 @@ void routing_task(void *pvParameters) {
 
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(1000));
+#ifdef CONFIG_I4A_FAST_TEST_TIMING
+        rt_diagnostics_tick(rt, 1000);
+        ld_tick();
+#endif
+        sync_on_tick(rt->deps.sync);
         rt_on_tick(rt, 1000);
         nm_tick();
     }
 }
 
 void app_main(void) {
+    ESP_ERROR_CHECK(os_diagnostics_start() ? ESP_OK : ESP_ERR_NO_MEM);
     node_ota_watch_boot();
     node_ota_boot_trace("node_setup.begin");
     node_setup();
     node_ota_boot_trace("node_setup.end");
-    node_ota_boot_trace("serial.begin");
-    ESP_ERROR_CHECK(node_ota_start_serial());
-    node_ota_boot_trace("serial.end");
 
     wireless_t *wl = node_get_wireless_instance();
     ring_share_t *rs = node_get_rs_instance();
@@ -67,7 +74,20 @@ void app_main(void) {
     node_device_orientation_t orientation = node_get_device_orientation();
     bool is_center_root = node_is_device_center_root();
 
+    if (node_is_orientation_mode_enabled() ||
+        node_is_configuration_mode_enabled()) {
+        node_set_routing_hook(ROUTING_HOOK_WIFI_NETIF_DEFAULT);
+        ESP_ERROR_CHECK(node_ota_confirm_boot());
+        if (node_is_orientation_mode_enabled()) {
+            antenna_orientation_mode_run(rs);
+        } else if (orientation == NODE_DEVICE_ORIENTATION_CENTER) {
+            ESP_ERROR_CHECK(config_portal_run());
+        }
+        return;
+    }
+
     ESP_ERROR_CHECK(nm_init(rs, orientation, node_get_uuid()) ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_ERROR_CHECK(dm_init(rs, orientation) ? ESP_OK : ESP_ERR_NO_MEM);
 
     sync_init(&_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET);
     ss_init(&ss, &_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET);
@@ -105,6 +125,12 @@ void app_main(void) {
         node_ota_boot_trace("wifi_sta.end");
     }
     
+    /* Mode requests from routing are asynchronous; confirm boot only after
+     * the directional radio/root AP and its worker initialized successfully.
+     * The home center waits for network provisioning later and has no radio yet. */
+    if (orientation != NODE_DEVICE_ORIENTATION_CENTER || is_center_root)
+        ESP_ERROR_CHECK(node_wait_wifi_started(20000) ? ESP_OK : ESP_ERR_TIMEOUT);
+
     node_ota_boot_trace("routing_task.begin");
     BaseType_t routing_started = xTaskCreatePinnedToCore(
         routing_task,
@@ -119,5 +145,9 @@ void app_main(void) {
     node_ota_boot_trace("routing_task.end");
     ESP_ERROR_CHECK(node_ota_confirm_boot());
     node_ota_boot_trace("app_main.ready");
+    /* Enable updates only after routing, Wi-Fi and boot confirmation finish. */
+    node_ota_boot_trace("serial.begin");
+    ESP_ERROR_CHECK(node_ota_start_serial());
+    node_ota_boot_trace("serial.end");
 
 }

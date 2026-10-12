@@ -8,6 +8,8 @@
 #include "server.h"
 #include "peer_session.h"
 #include "node.h"
+#include <errno.h>
+#include "os/os.h"
 
 #define PORT 3999
 
@@ -28,6 +30,7 @@ static bool get_network(uint32_t *net, uint32_t *mask) {
 
 static void socket_read_loop(int sock, uint32_t net, uint32_t mask) {
     bool admitted = peer_session_open(&session, sock, false, NULL);
+    os_diag("server","event=session_decision role=%u accepted=%u",node_get_device_orientation(),admitted);
     if (admitted && server_is_up) {
         node_on_peer_connected(net, mask, PEER_SERVER);
         uint8_t buffer[PEER_SESSION_MAX_MESSAGE];
@@ -35,8 +38,11 @@ static void socket_read_loop(int sock, uint32_t net, uint32_t mask) {
             int len = peer_session_receive(&session, buffer, sizeof(buffer));
             if (len <= 0) break;
             node_on_peer_message(buffer, len);
+            node_set_peer_offer_accepted(true);
         }
+        node_set_peer_offer_accepted(false);
         peer_session_close(&session);
+        os_diag("server","event=peer_lost role=%u",node_get_device_orientation());
         node_on_peer_lost(net, mask, PEER_SERVER);
     } else {
         peer_session_close(&session);
@@ -49,33 +55,37 @@ static void socket_read_loop(int sock, uint32_t net, uint32_t mask) {
 
 static void tcp_server_task(void *arg) {
     (void)arg;
-    uint32_t net, mask;
-    int listener = -1;
-    if (!get_network(&net, &mask)) goto stopped;
-    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (listener < 0) goto stopped;
-    struct sockaddr_in address = {
-        .sin_family = AF_INET, .sin_port = htons(PORT), .sin_addr.s_addr = htonl(INADDR_ANY)
-    };
-    int reuse = 1;
-    setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-    if (bind(listener, (struct sockaddr *)&address, sizeof(address)) || listen(listener, 1)) goto stopped;
     while (server_is_up) {
-        fd_set readers;
-        FD_ZERO(&readers);
-        FD_SET(listener, &readers);
-        struct timeval timeout = { .tv_sec = 0, .tv_usec = 200000 };
-        if (lwip_select(listener + 1, &readers, NULL, NULL, &timeout) <= 0) continue;
-        int sock = accept(listener, NULL, NULL);
-        if (sock < 0) continue;
-        socket_read_loop(sock, net, mask);
-        shutdown(sock, SHUT_RDWR);
-        close(sock);
+        uint32_t net=0,mask=0;
+        int listener=-1;
+        if (!get_network(&net,&mask)) goto retry;
+        listener=socket(AF_INET,SOCK_STREAM,IPPROTO_IP);
+        if (listener<0) goto retry;
+        struct sockaddr_in address={.sin_family=AF_INET,.sin_port=htons(PORT),.sin_addr.s_addr=htonl(INADDR_ANY)};
+        int reuse=1;
+        setsockopt(listener,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
+        if (bind(listener,(struct sockaddr *)&address,sizeof(address)) || listen(listener,1)) goto retry;
+        os_diag("server","event=listener_ready role=%u transport=%08lx/%08lx",node_get_device_orientation(),(unsigned long)net,(unsigned long)mask);
+        while (server_is_up) {
+            fd_set readers; FD_ZERO(&readers); FD_SET(listener,&readers);
+            struct timeval timeout={.tv_sec=0,.tv_usec=200000};
+            int ready=lwip_select(listener+1,&readers,NULL,NULL,&timeout);
+            if (ready<0 && errno!=EINTR) break;
+            if (ready<=0) continue;
+            int sock=accept(listener,NULL,NULL);
+            if (sock<0) continue;
+            socket_read_loop(sock,net,mask);
+            shutdown(sock,SHUT_RDWR); close(sock);
+        }
+retry:
+        if (listener>=0) close(listener);
+        if (server_is_up) {
+            os_diag("server","event=listener_retry role=%u errno=%d",node_get_device_orientation(),errno);
+            for (unsigned i=0;i<20 && server_is_up;++i) vTaskDelay(pdMS_TO_TICKS(100));
+        }
     }
-stopped:
-    if (listener >= 0) close(listener);
-    server_is_up = false;
-    server_task = NULL;
+    os_diag("server","event=listener_stopped role=%u",node_get_device_orientation());
+    server_task=NULL;
     vTaskDelete(NULL);
 }
 

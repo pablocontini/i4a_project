@@ -1,0 +1,49 @@
+{
+  "origin": "Extracto de tcpdump pegado por el usuario en el chat, no descarga del archivo completo de la RPi",
+  "date": "2026-10-11",
+  "capture_command": "sudo timeout 300 tcpdump -ni wlan0 -s0 -A 'udp dst port 8000' 2>&1 | tee ~/telemetria_sin_usb_ramona.txt",
+  "remote_file": "/home/rpi/telemetria_sin_usb_ramona.txt",
+  "phone_reported": {"ip": "10.52.0.4", "gateway": "10.52.0.1", "ping_result": "El usuario informó que ambos pings responden; reconfirmar destinos exactos"},
+  "samples": [
+    {
+      "time": "19:55:48.075483",
+      "source": "10.255.255.253:53151",
+      "fields": ["orientation","uuid","link","subnet","mask","channel","rssi","rx_bytes","tx_bytes","peer_admitted","sample_age_ms"],
+      "data": [
+        ["N","4022D83D8489","I4A_N_000000000000","10.32.0.0","255.224.0.0",1,-41,58753,66563,1,12640],
+        ["S","78421C67CC9D","I4A_S_000000000000","10.64.0.0","255.224.0.0",7,-127,13864,14007,0,12806],
+        ["E","C8F09E9E6F75","I4A_E_000000000000","10.96.0.0","255.224.0.0",4,-127,29667,64591,0,12766],
+        ["W","A842E34BF829","I4A_W_000000000000","10.128.0.0","255.224.0.0",10,-11,15839,14891,1,12818],
+        ["C","20E7C8599A25","Internet4All_Root","10.0.0.0","255.0.0.0",11,-7,96490,89085,0,12670]
+      ],
+      "uptime_mins": 76
+    },
+    {
+      "time": "19:56:25.372882",
+      "source": "10.128.0.2:55824",
+      "fields": ["orientation","uuid","link","subnet","mask","channel","rssi","rx_bytes","tx_bytes","peer_admitted","sample_age_ms"],
+      "data": [
+        ["N","142B2FC1DD91","N/A","10.132.0.0","255.252.0.0",0,-127,0,0,0,5061],
+        ["S","841FE82720A9","I4A_S_142B2FC05E7D","10.136.0.0","255.252.0.0",11,-127,0,0,0,5072],
+        ["E","841FE82715A1","I4A_W_000000000000","10.140.0.0","255.252.0.0",10,-13,15377,16367,1,5099],
+        ["W","841FE8272039","I4A_W_142B2FC05E7D","10.144.0.0","255.252.0.0",2,-34,5541,5209,1,5111],
+        ["C","142B2FC05E7D","ComNetAR - Grillo","10.148.0.0","255.252.0.0",11,-127,0,0,0,5204]
+      ],
+      "uptime_mins": 13
+    },
+    {
+      "time": "19:56:41.497741",
+      "source": "10.32.0.2:62825",
+      "fields": ["orientation","uuid","link","subnet","mask","channel","rssi","rx_bytes","tx_bytes","peer_admitted","sample_age_ms"],
+      "data": [
+        ["N","841FE82713BD","I4A_N_20E7C85AA245","10.36.0.0","255.252.0.0",5,-127,20261,17731,0,2426],
+        ["S","841FE8271CB9","I4A_N_000000000000","10.40.0.0","255.252.0.0",1,-32,89550,75512,1,3469],
+        ["E","841FE8271E99","I4A_W_142B2FC05E7D","10.44.0.0","255.252.0.0",2,-31,5371,5811,1,3468],
+        ["W","841FE827199D","I4A_W_20E7C85AA245","10.48.0.0","255.252.0.0",2,-127,0,0,0,3490],
+        ["C","20E7C85AA245","ComNetAR - Ramona","10.52.0.0","255.252.0.0",11,-38,81574,50284,0,3585]
+      ],
+      "uptime_mins": 31
+    }
+  ],
+  "note": "Se recibieron muestras posteriores adicionales y una última fila parcial. Este anexo conserva tres paquetes completos originales, uno por nodo. No hubo nuevo corte en este extracto."
+}

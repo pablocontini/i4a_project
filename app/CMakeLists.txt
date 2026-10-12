@@ -7,7 +7,10 @@ set(EXTRA_COMPONENT_DIRS
     ${CMAKE_SOURCE_DIR}/../components/integration
 )
 
-set(SDKCONFIG_DEFAULTS "${CMAKE_SOURCE_DIR}/../components/sdkconfig.defaults")
+set(SDKCONFIG_DEFAULTS "${CMAKE_SOURCE_DIR}/../components/sdkconfig.defaults;${CMAKE_SOURCE_DIR}/sdkconfig.defaults")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+if(NOT DEFINED PROJECT_VER)
+    set(PROJECT_VER "coord-v2-20261010-ramona")
+endif()
 project(main)

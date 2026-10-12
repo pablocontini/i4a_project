@@ -1,0 +1,3 @@
+#define TASK_SPI_STACK 4096
+#define TASK_SPI_PRIORITY 2
+#define TASK_SPI_CORE 0

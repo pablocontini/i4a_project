@@ -1,0 +1,3 @@
+# Experimental eight extra RX buffers; costs additional static RAM.
+CONFIG_SPI_RX_EXTRA_BUFFERS=8
+CONFIG_LWIP_TCPIP_TASK_STACK_SIZE=4096

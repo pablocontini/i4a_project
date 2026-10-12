@@ -50,11 +50,22 @@ typedef struct routing {
      * turn in the critical section.
      */
     rt_internal_queue_t internal_queue;
+    mutex_t queue_lock;
+    rt_internal_queue_t dispatch_internal;
+    rt_external_queue_t dispatch_external;
+    bool token_waiting;
 
     /**
      * Private internal device state and role definition.
      */
     rt_role_t role;
+    /** Timer work is dispatched with the routing token, like peer events. */
+    uint32_t pending_tick_ms;
+    uint32_t pending_tick_request_ms;
+    /* Local diagnostic cadence; these fields are not shared on the wire. */
+    uint32_t diagnostic_elapsed_ms;
+    uint32_t diagnostic_dump_elapsed_ms;
+    bool diagnostic_dump_started;
 } routing_t;
 
 /**
@@ -100,6 +111,10 @@ void rt_on_start(routing_t *self);
  *        this parameter will have a constant value of 1000 in each invocation.
  */
 void rt_on_tick(routing_t *self, uint32_t dt_ms);
+
+/* Read-only, nonblocking snapshots. Call from one task, independently of token
+ * acquisition; no route, queue or recovery-timer state is changed. */
+void rt_diagnostics_tick(routing_t *self, uint32_t dt_ms);
 
 /**
  * Routing module output.

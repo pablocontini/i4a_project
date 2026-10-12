@@ -16,6 +16,8 @@ typedef struct shared_data {
     mutex_t lock;
     void *ptr;
     uint8_t length;
+    void (*on_updated)(void *context);
+    void *context;
 } shared_data_t;
 
 typedef struct shared_state {
@@ -24,6 +26,9 @@ typedef struct shared_state {
     mutex_t broadcast_lock;
     uint8_t orientation;
     shared_data_t data[RS_LAST_COMPONENT_ID];
+    bool dirty[RS_LAST_COMPONENT_ID];
+    uint32_t seen_session[RS_LAST_COMPONENT_ID], seen_sequence[RS_LAST_COMPONENT_ID];
+    uint8_t seen_owner[RS_LAST_COMPONENT_ID];
 } shared_state_t;
 
 /**
@@ -48,6 +53,7 @@ void ss_watch(shared_state_t *ss, component_id_t component, shared_data_t data);
  * section while calling this method. Otherwise the method will abort.
  */
 void ss_refresh(shared_state_t *ss, component_id_t component);
+bool ss_flush(shared_state_t *self, component_id_t component);
 
 /**
  * Free resources used by this component.

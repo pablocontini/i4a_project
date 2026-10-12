@@ -1,4 +1,5 @@
 #include "ring_link_netif_rx.h"
+#include "ip_diagnostics.h"
 
 static const char* TAG = "==> ring_link_netif_rx";
 
@@ -37,6 +38,8 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
     struct pbuf *q;
     struct ip_hdr *ip_header;
     esp_err_t error;
+    size_t diagnostic_len = p->len < sizeof(p->buffer) ? p->len : sizeof(p->buffer);
+    ip_diag_packet(p->buffer, diagnostic_len, IP_DIAG_SPI_RX, 0);
 
     if (p->len <= 0 || p->len < IP_HLEN) {
         ESP_LOGW(TAG, "Discarding invalid payload.");
@@ -90,6 +93,7 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
 
     // Validate that payload size is sufficient
     if (iphdr_len > p->len) {
+        ip_diag_packet(p->buffer, diagnostic_len, IP_DIAG_SPI_RX_BAD_LENGTH, ESP_FAIL);
         ESP_LOGW(TAG, "Payload size (%d) is smaller than IP length (%d). Discarding packet.", p->len, iphdr_len);
         return ESP_OK;
     }
@@ -97,6 +101,7 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
     // Allocate pbuf with required size
     q = pbuf_alloc(PBUF_TRANSPORT, iphdr_len, PBUF_RAM);
     if (q == NULL) {
+        ip_diag_packet(p->buffer, diagnostic_len, IP_DIAG_SPI_RX_ALLOC_FAIL, ESP_FAIL);
         ESP_LOGW(TAG, "Failed to allocate pbuf.");
         return ESP_FAIL;
     }
@@ -109,11 +114,11 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
 
     //ip4_debug_print(q);
 
-    // Pass pbuf to esp_netif
+    // The input callback owns q, including when lwIP rejects the packet.
+    // esp_netif_receive may hide errors when receive reporting is disabled.
     error = esp_netif_receive(ring_link_rx_netif, q, q->tot_len, NULL);
     if (error != ESP_OK) {
         ESP_LOGW(TAG, "process_thread_receive failed.");
-        pbuf_free(q);
     }
 
     return error;
@@ -121,14 +126,15 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
 
 static err_t output_function(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
 {
-    // ESP_LOGI(TAG, "Calling output_function(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)");
-    // printf("len %u\n", p->len);
-    // printf("total len %u\n", p->tot_len);
+    (void)ipaddr;
+    if (!netif || !netif->linkoutput) return ERR_IF;
+    if (!p || !p->payload || p->len == 0) return ERR_VAL;
     struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
     if((IPH_V(iphdr) == 4) || (IPH_V(iphdr) == 6)){
-        netif->linkoutput(netif, p);
+        return netif->linkoutput(netif, p);
     }
-    return ESP_OK;
+    ESP_LOGW(TAG, "Non-IP packet received!");
+    return ERR_VAL;
 }
 
 static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
@@ -140,9 +146,11 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
     ip4_debug_print(q);
     esp_netif_t *esp_netif = esp_netif_get_handle_from_netif_impl(netif);
     esp_err_t ret = ESP_FAIL;
+    ip_diag_pbuf(p, IP_DIAG_SPI_TX_ATTEMPT, 0);
 
     if (!esp_netif) {
         LWIP_DEBUGF(NETIF_DEBUG, ("corresponding esp-netif is NULL: netif=%p pbuf=%p len=%d\n", netif, p, p->len));
+        ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ERR_IF);
         return ERR_IF;
     }
     if (q->next == NULL) {
@@ -154,6 +162,7 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
         if (q != NULL) {
             pbuf_copy(q, p);
         } else {
+            ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ERR_MEM);
             return ERR_MEM;
         }
         ret = esp_netif_transmit(esp_netif, q->payload, q->len);
@@ -162,8 +171,10 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
     }
     /* Check error */
     if (likely(ret == ESP_OK)) {
+        ip_diag_pbuf(p, IP_DIAG_SPI_TX_OK, ret);
         return ERR_OK;
     }
+    ip_diag_pbuf(p, IP_DIAG_SPI_TX_FAIL, ret);
     if (ret == ESP_ERR_NO_MEM) {
         return ERR_MEM;
     }
@@ -182,35 +193,6 @@ err_t ring_link_rx_netstack_lwip_init_fn(struct netif *netif)
     netif->hwaddr_len = ETH_HWADDR_LEN;
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_LINK_UP;
     return ERR_OK;
-}
-
-esp_netif_recv_ret_t ring_link_rx_netstack_lwip_input_fn(void *h, void *buffer, size_t len, void *l2_buff)
-{
-    struct netif *netif = h;
-    err_t result;  // Variable para almacenar el código de retorno
-
-    /* Verifica que el buffer y la interfaz sean válidos */
-    if (unlikely(!buffer || !netif_is_up(netif))) {
-        if (l2_buff) {
-            esp_netif_free_rx_buffer(netif->state, l2_buff);
-        }
-        return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_FAIL);
-    }
-
-    /* Usa directamente el buffer recibido */
-    struct pbuf *p = (struct pbuf *)buffer;
-
-    /* Llama a la función de entrada y captura el resultado */
-    result = netif->input(p, netif);
-
-    /* Imprime el código de error si hay problemas */
-    if (unlikely(result != ERR_OK)) {
-        ESP_LOGE("ring_link", "netif->input error: %d", result);
-        return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_FAIL);
-    }
-
-    /* Todo salió bien */
-    return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_OK);
 }
 
 static esp_err_t ring_link_rx_driver_transmit(void *h, void *buffer, size_t len)
