@@ -6,6 +6,9 @@
 #include "routing/routing.h"
 
 uint32_t mask_size(uint32_t n);
+/* A node reserves three bits for its sectors; each sector needs at least /30. */
+bool node_network_is_valid(const network_t *node_network, orientation_t orientation);
+/* Returns 0/0 when the node network cannot be subdivided safely. */
 network_t get_node_subnet(const network_t *node_network, orientation_t orientation);
 
 void add_global_route(routing_t *self, const network_t *route, orientation_t output);

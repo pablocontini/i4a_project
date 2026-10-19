@@ -1,6 +1,8 @@
 idf_component_register(SRCS 
         "ring_link_netif_common.c"
+        "ring_link_netif_payload.c"
         "ring_link_netif_rx.c"
+        "ring_link_netif_input.c"
         "ring_link_netif_tx.c"
         "ring_link_netif.c"
     INCLUDE_DIRS "include"

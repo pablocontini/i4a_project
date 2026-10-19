@@ -71,3 +71,25 @@ EXPORT int test_peer_callbacks_preserve_session_order(void) {
     CHECK(seen == 6 && !memcmp(events, expected, sizeof(expected)));
     return 0;
 }
+
+EXPORT int test_sibling_callbacks_reject_invalid_lengths_and_copy_maximum(void) {
+    created = seen = 0;
+    CHECK(node_init_event_queues() == ESP_OK);
+    uint8_t input[MAX_MESSAGE_SIZE + 2];
+    for (unsigned i = 0; i < sizeof(input); ++i) input[i] = (uint8_t)i;
+    node_on_sibling_message(input, sizeof(input));
+    CHECK(queues[1].count == 0);
+    node_on_sibling_message(NULL, 1);
+    node_on_sibling_message(input, 0);
+    CHECK(queues[1].count == 0);
+    input[MAX_MESSAGE_SIZE] = 0xa5; /* Final byte must survive the length write. */
+    node_on_sibling_message(input, MAX_MESSAGE_SIZE + 1);
+    CHECK(queues[1].count == 1);
+    message_t received;
+    memcpy(&received, queues[1].items[0], sizeof(received));
+    CHECK(received.length == MAX_MESSAGE_SIZE + 1);
+    CHECK(!memcmp(received.data, input, MAX_MESSAGE_SIZE + 1));
+    memset(input, 0, sizeof(input));
+    CHECK(received.data[1] == 1 && received.data[MAX_MESSAGE_SIZE] == 0xa5);
+    return 0;
+}

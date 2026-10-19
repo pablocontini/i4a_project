@@ -17,6 +17,8 @@ typedef enum {
 typedef struct {
     uint8_t destination;
     uint8_t cs_id;
+    uint32_t session;
+    uint32_t sequence;
 } sync_token_grant_t;
 
 typedef struct {
@@ -24,6 +26,7 @@ typedef struct {
 } sync_token_request_t;
 
 typedef struct {
+    uint8_t version;
     uint8_t kind;
     union {
         sync_token_grant_t token_grant;
@@ -41,6 +44,7 @@ typedef struct sync_leader {
     uint8_t first_device_to_get_token;
     uint8_t requested_tokens[RS_LAST_COMPONENT_ID];
     bool is_token_out[RS_LAST_COMPONENT_ID];
+    uint32_t retry_ms[RS_LAST_COMPONENT_ID];
 } sync_leader_t;
 
 #endif  // _I4A_SYNC_IMPL_H_

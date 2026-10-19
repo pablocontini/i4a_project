@@ -1,0 +1,2 @@
+#pragma once
+#define CONFIG_I4A_CAPTURE_DIAGNOSTICS 1

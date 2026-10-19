@@ -6,15 +6,22 @@ static const char* TAG = "==> ring_link_internal";
 static QueueHandle_t ring_link_internal_queue = NULL;
 
 
-static esp_err_t ring_link_internal_handler(ring_link_payload_t *p)
+esp_err_t ring_link_internal_route(ring_link_payload_t *p, bool *deliver_local)
 {
+    *deliver_local = false;
     if (ring_link_payload_is_broadcast(p))  // broadcast
     {
-        return broadcast_handler(p);
+        /* Returning broadcasts are transport ACKs. They must never wait for
+         * an application callback which may itself be awaiting such an ACK. */
+        if (ring_link_payload_is_from_device(p))
+            return broadcast_handler(p);
+        *deliver_local = true;
+        return ring_link_lowlevel_forward_payload(p);
     }
     else if (ring_link_payload_is_for_device(p))  // payload for me
     {
-        return ring_link_internal_process(p);
+        *deliver_local = true;
+        return ESP_OK;
     }
     else  // not for me, forwarding
     {
@@ -29,7 +36,9 @@ static void ring_link_internal_process_task(void *pvParameters)
     
     while (true) {
         if (xQueueReceive(ring_link_internal_queue, &payload, portMAX_DELAY) == pdTRUE) {
-            rc = ring_link_internal_handler(payload);
+            /* Physical forwarding already happened at ingress. Only local
+             * delivery may wait behind application queues here. */
+            rc = ring_link_internal_process(payload);
             // ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
             ring_link_lowlevel_free_rx_buffer(payload);
             taskYIELD();

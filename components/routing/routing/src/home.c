@@ -10,7 +10,7 @@
 #define GET_STATE(self) (&((self)->role.state.home))
 
 static void on_start(routing_t *self) {
-    ss_refresh(self->deps.ss, RS_ROUTING);
+    WITH_LOCK(&self->queue_lock, { self->pending_publish = true; });
 }
 
 static void on_provision(routing_t *self, const rt_sibl_provision_t *provision) {
@@ -25,6 +25,8 @@ static void on_provision(routing_t *self, const rt_sibl_provision_t *provision) 
     }
 
     network_t my_subnet = get_node_subnet(&provision->network, self->orientation);
+    if (my_subnet.mask == 0 || provision->dtr == 0)
+        return;
     log_warn(TAG, "[on_provision] Got subnet %08X/%d", my_subnet.addr, mask_size(my_subnet.mask));
 
     add_global_route(self, &my_subnet, self->orientation);

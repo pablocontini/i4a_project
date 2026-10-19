@@ -39,6 +39,9 @@ static void on_new_gateway_request(routing_t *self, const rt_sibl_send_new_gatew
     (void)unused;
     rt_root_state_t *state = GET_STATE(self);
 
+    if (state->gateway_requested)
+        return;
+
     state->gateway_requested = true;
     state->gateway_requested_timeout = GATEWAY_REQUEST_TIMEOUT;
 }
@@ -69,9 +72,12 @@ static void on_tick(routing_t *self, uint32_t dt_ms) {
 }
 
 bool create_root_core(routing_t *self, uint32_t root_network, uint32_t root_mask) {
+    network_t network = NETWORK(root_network, root_mask);
+    if (!node_network_is_valid(&network, ORIENTATION_CENTER))
+        return false;
     rt_root_state_t *state = GET_STATE(self);
 
-    state->network = NETWORK(root_network, root_mask);
+    state->network = network;
     state->gateway_requested = false;
     state->gateway_requested_timeout = 0;
 

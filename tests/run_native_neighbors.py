@@ -17,15 +17,25 @@ def main():
     build.mkdir(parents=True, exist_ok=True)
     component = ROOT / "components/integration/neighbor_manager"
     suites = {
+        "spi": ("test_spi_keeps_dma_receives_queued_and_drops_truncated_frames",
+                "test_spi_rearms_when_application_retains_all_receive_buffers",
+                "test_spi_full_delivery_queue_drops_without_leaking_or_delaying_rearm"),
+        "lowlevel": ("test_lowlevel_pauses_ip_and_preserves_internal_forwarding",),
+        "ring": ("test_ring_maintenance_admission_and_clock",
+                 "test_boot_gate_preserves_provisioning_and_ota_lease_pause"),
         "registry": ("test_symmetry_and_other_neighbors", "test_pending_tie_break_and_confirmed_priority",
                      "test_expiry_renewal_and_stale_sessions", "test_identity_validation",
                      "test_all_simultaneous_endpoint_orders"),
         "manager": ("test_spi_reservations_snapshots_and_release", "test_spi_loss_expiry_and_stale_cleanup",
-                    "test_spi_incoming_identity_and_invalid_owner"),
+                    "test_spi_incoming_identity_and_invalid_owner",
+                    "test_neighbor_callback_defers_broadcast_and_handles_full_queue",
+                    "test_neighbor_worker_failure_and_idle_expiry",
+                    "test_neighbor_duplicate_requests_and_frozen_leases"),
         "session": ("test_identity_admission_both_roles_and_framing", "test_duplicate_and_lost_reservation_never_admit",
                     "test_incompatible_identity_and_incomplete_frames", "test_expired_or_unrenewed_session_stops_transport"),
         "channel": ("test_scan_cooldown_and_channel_independence",),
-        "callbacks": ("test_peer_callbacks_preserve_session_order",),
+        "callbacks": ("test_peer_callbacks_preserve_session_order",
+                      "test_sibling_callbacks_reject_invalid_lengths_and_copy_maximum"),
     }
     for suite, tests in suites.items():
         library = build / (f"neighbors_{suite}.dll" if sys.platform == "win32" else f"libneighbors_{suite}.so")
@@ -35,6 +45,10 @@ def main():
         if sys.platform.startswith("linux"):
             # Socket providers in this library must take precedence over libc.
             command += ["-Wl,-Bsymbolic"]
+        if suite == "spi":
+            command += ["-I", str(ROOT / "tests/native/spi/mocks")]
+        if suite == "ring":
+            command += ["-I", str(ROOT / "components/routing/ring_share/include")]
         for include in (component / "include", ROOT / "tests/native/neighbors/mocks", ROOT / "tests/native/mocks",
                         ROOT / "components/routing/os/include", ROOT / "components/wireless/peer_session/include"):
             command += ["-I", str(include)]

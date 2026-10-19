@@ -18,6 +18,7 @@ static const char *uuid;
 static uint8_t orientation;
 static bool reject_commit, fail_renew, fail_send, interrupted_send;
 static unsigned reservations, shutdowns;
+static peer_session_t *send_during_open;
 
 bool mutex_create(mutex_t *m) { *m = (void *)1; return true; }
 bool mutex_lock(mutex_t *m) { return m && *m == (void *)1; }
@@ -42,12 +43,18 @@ bool nm_owns(const nm_link_id_t *link) { return nm_registry_owns(&registry, orie
 
 int shutdown(int sock, int how) { (void)sock; (void)how; ++shutdowns; return 0; }
 int setsockopt(int sock, int level, int option, const void *value, unsigned len) {
-    (void)sock; (void)level; (void)option; (void)value; (void)len; return 0;
+    (void)sock; (void)level; (void)option; (void)value; (void)len;
+    if (send_during_open) {
+        uint8_t message = 1;
+        peer_session_send(send_during_open, &message, 1);
+        send_during_open = NULL;
+    }
+    return 0;
 }
 int send(int sock, const void *data, unsigned len, int flags) {
     (void)sock; (void)flags;
     if (interrupted_send) { interrupted_send = false; errno = EINTR; return -1; }
-    if (fail_send) return -1;
+    if (fail_send) { errno = EPIPE; return -1; }
     if (len > fragment) len = fragment;
     if (output_size + len > sizeof(output)) return -1;
     memcpy(output + output_size, data, len);
@@ -75,6 +82,7 @@ static void reset(bool station) {
     clock_ms = 0;
     fragment = 1024;
     reject_commit = fail_renew = fail_send = interrupted_send = false;
+    send_during_open = NULL;
     uuid = station ? "A00000000000" : "B00000000000";
     orientation = station ? 0 : 1;
     const uint8_t hello[24] = { 'I', '4', 'A', 'N', 1, station ? 0 : 1, station ? 1 : 0, 0 };
@@ -92,7 +100,9 @@ EXPORT int test_identity_admission_both_roles_and_framing(void) {
         interrupted_send = true;
         peer_session_t session;
         CHECK(peer_session_init(&session));
+        send_during_open = &session;
         CHECK(peer_session_open(&session, 3, station, "I4A_S_B00000000000"));
+        CHECK(shutdowns == 0); /* Background traffic must not abort admission. */
         CHECK(session.admitted && nm_owns(&session.link) && reservations == 1);
         CHECK(output_size == 27 && output[24] == 1 && output[25] == 1 && output[26] == 1);
         const uint8_t frames[] = {0, 3, 10, 11, 12, 0, 2, 13, 14};
@@ -103,6 +113,8 @@ EXPORT int test_identity_admission_both_roles_and_framing(void) {
         CHECK(peer_session_receive(&session, data, sizeof(data)) == 2 && data[1] == 14);
         CHECK(peer_session_send(&session, data, 2));
         CHECK(output_size == 31 && output[27] == 0 && output[28] == 2 && output[30] == 14);
+        fail_send = true;
+        CHECK(!peer_session_send(&session, data, 2) && shutdowns == 1);
         nm_link_id_t previous = session.link;
         peer_session_close(&session);
         CHECK(!session.admitted && !nm_owns(&previous));

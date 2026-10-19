@@ -1,0 +1,8 @@
+menu "I4A capture diagnostics"
+config I4A_CAPTURE_DIAGNOSTICS
+    bool "Emit periodic UART route, coordination, radio and heap snapshots"
+    default n
+    help
+        Passive diagnostics independent of the normal log level. Adds one task
+        and UART traffic, but does not change the ring or wireless protocol.
+endmenu

@@ -1,87 +1,81 @@
 #include "shared_state/shared_state.h"
-
 #include <string.h>
 
-#define TAG "shared_state"
+/* All five boards must run the same v2 protocol. */
+#define SHARED_STATE_VERSION 2
+typedef struct {
+    uint8_t version, component, owner, reserved;
+    uint32_t session, sequence;
+} state_header_t;
+
+static bool newer(shared_state_t *self, component_id_t id, uint32_t seq, uint8_t owner) {
+    return seq > self->sequence[id] ||
+           (seq == self->sequence[id] && owner > self->owner[id]);
+}
 
 static void on_sibling_message(void *ctx, const uint8_t *msg, uint16_t len) {
     shared_state_t *self = ctx;
-
-    uint8_t component = msg[0];
-    if (component >= RS_LAST_COMPONENT_ID) {
-        os_panic("[shared_state] Invalid component id %u\n", component);
-        return;
-    }
-
-    shared_data_t *data = &self->data[component];
-    if (!data->ptr) {
-        os_panic("[shared_state] Component %u has no data to refresh\n", component);
-        return;
-    }
-
-    if (data->length != len - 1) {
-        os_panic("[shared_state] Data length does not match (%u != %u)\n", data->length, len - 1);
-        return;
-    }
-
-    WITH_LOCK(data->lock, { memcpy(data->ptr, msg + 1, data->length); });
-}
-
-bool ss_init(shared_state_t *self, sync_t *sync, ring_share_t *rs, orientation_t orientation) {
-    memset(self, 0, sizeof(shared_state_t));
-
-    self->sync = sync;
-    self->rs = rs;
-    self->orientation = orientation;
-
-    if (!mutex_create(&self->broadcast_lock))
-        return false;
-
-    rs_register_component(
-        self->rs, RS_SHARED_STATE,
-        (ring_callback_t){
-            .callback = on_sibling_message,
-            .context = self,
+    state_header_t header;
+    if (!msg || len < sizeof(header)) return;
+    memcpy(&header, msg, sizeof(header));
+    if (header.version != SHARED_STATE_VERSION || header.reserved ||
+        header.component >= RS_LAST_COMPONENT_ID || header.owner < 1 ||
+        header.owner > N_DEVICES || !header.session || !header.sequence) return;
+    component_id_t id = header.component;
+    shared_data_t *data = &self->data[id];
+    if (!data->ptr || !data->lock || len != sizeof(header) + data->length ||
+        !sync_token_matches(self->sync, id, header.session, header.sequence, header.owner)) return;
+    WITH_LOCK(&data->lock, {
+        if (newer(self, id, header.sequence, header.owner)) {
+            memcpy(data->ptr, msg + sizeof(header), data->length);
+            self->sequence[id] = header.sequence;
+            self->owner[id] = header.owner;
         }
-    );
-
-    return true;
-}
-
-static void broadcast_data(shared_state_t *self, component_id_t component) {
-    shared_data_t *data = &self->data[component];
-
-    WITH_LOCK(data->lock, {
-        WITH_LOCK(self->broadcast_lock, {
-            uint8_t buffer[1 + data->length];
-            buffer[0] = component;
-            memcpy(buffer + 1, data->ptr, data->length);
-
-            rs_broadcast(self->rs, RS_SHARED_STATE, buffer, 1 + data->length);
-        });
     });
 }
 
-void ss_watch(shared_state_t *self, component_id_t component, shared_data_t data) {
-    self->data[component] = data;  // TODO: There could be a race condition here
+bool ss_init(shared_state_t *self, sync_t *sync, ring_share_t *rs, orientation_t orientation) {
+    memset(self, 0, sizeof(*self));
+    self->sync = sync;
+    self->rs = rs;
+    self->orientation = orientation;
+    if (!mutex_create(&self->broadcast_lock)) return false;
+    rs_register_component(rs, RS_SHARED_STATE, (ring_callback_t){on_sibling_message, self});
+    return true;
 }
 
-void ss_refresh(shared_state_t *self, component_id_t component) {
-    if (!sync_is_inside_critical_section(self->sync, component)) {
-        os_panic("[shared_state] Not inside critical section -- aborting");
-        return;
-    }
+void ss_watch(shared_state_t *self, component_id_t id, shared_data_t data) {
+    if ((unsigned)id >= RS_LAST_COMPONENT_ID) return;
+    self->data[id] = data;
+}
 
-    broadcast_data(self, component);
+bool ss_refresh(shared_state_t *self, component_id_t id) {
+    if ((unsigned)id >= RS_LAST_COMPONENT_ID) return false;
+    shared_data_t *data = &self->data[id];
+    uint32_t session, sequence;
+    if (!data->ptr || !data->lock ||
+        !sync_current_token(self->sync, id, &session, &sequence)) return false;
+    bool sent = false;
+    state_header_t header = {
+        SHARED_STATE_VERSION, id, self->orientation, 0, session, sequence};
+    WITH_LOCK(&self->broadcast_lock, {
+        uint8_t buffer[sizeof(state_header_t) + UINT8_MAX];
+        memcpy(buffer, &header, sizeof(header));
+        WITH_LOCK(&data->lock, {
+            memcpy(buffer + sizeof(header), data->ptr, data->length);
+            /* Reserve the current writer even if transmission fails, so a late
+             * earlier writer cannot overwrite the uncommitted local changes. */
+            if (newer(self, id, sequence, self->orientation)) {
+                self->sequence[id] = sequence;
+                self->owner[id] = self->orientation;
+            }
+        });
+        sent = rs_broadcast(self->rs, RS_SHARED_STATE, buffer, sizeof(header) + data->length);
+    });
+    return sent;
 }
 
 void ss_destroy(shared_state_t *self) {
-    rs_register_component(
-        self->rs, RS_SHARED_STATE,
-        (ring_callback_t){
-            .callback = NULL,
-            .context = NULL,
-        }
-    );
+    rs_register_component(self->rs, RS_SHARED_STATE, (ring_callback_t){0});
     mutex_destroy(&self->broadcast_lock);
 }

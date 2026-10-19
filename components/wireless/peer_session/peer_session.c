@@ -179,9 +179,12 @@ bool peer_session_send(peer_session_t *session, const uint8_t *data, uint16_t le
     bool sent = false;
     uint8_t header[2] = { len >> 8, len };
     WITH_LOCK(&session->write_lock, {
-        if (session->admitted && !session->stopping && nm_owns(&session->link))
-            sent = write_all(session->sock, header, sizeof(header)) && write_all(session->sock, data, len);
-        if (!sent && session->sock >= 0) shutdown(session->sock, SHUT_RDWR);
+        /* Routing traffic may arrive while admission still owns the socket. */
+        if (session->admitted && !session->stopping) {
+            if (nm_owns(&session->link))
+                sent = write_all(session->sock, header, sizeof(header)) && write_all(session->sock, data, len);
+            if (!sent && session->sock >= 0) shutdown(session->sock, SHUT_RDWR);
+        }
     });
     return sent;
 }

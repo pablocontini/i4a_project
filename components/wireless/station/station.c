@@ -61,7 +61,7 @@ static bool is_network_allowed(char* device_uuid, char* network_prefix, char* ne
 
 }
 
-void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t orientation, char* device_uuid, const char* password, bool is_apsta) {
+void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t orientation, const char* device_uuid, const char* password, bool is_apsta) {
 
   strcpy(stationPtr->ssid_like, wifi_ssid_like);
   strcpy(stationPtr->device_uuid, device_uuid);
@@ -81,7 +81,12 @@ void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t ori
 
 }
 void station_find_ap(StationPtr stationPtr) {
-  esp_wifi_scan_start(NULL, true);
+  stationPtr->ap_found = false;
+  esp_err_t result = esp_wifi_scan_start(NULL, true);
+  if (result != ESP_OK) {
+    ESP_LOGW(LOGGING_TAG, "AP scan failed: %s", esp_err_to_name(result));
+    return;
+  }
 
   uint16_t ap_count = 0;
   esp_wifi_scan_get_ap_num(&ap_count);
@@ -139,7 +144,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
   if (event_base == WIFI_EVENT) {
     switch (event_id) {
-      case WIFI_EVENT_STA_DISCONNECTED:
+      case WIFI_EVENT_STA_DISCONNECTED: {
         wifi_event_sta_disconnected_t *disconn = (wifi_event_sta_disconnected_t *)event_data;
         if (stationPtr->stopping) {
           client_close();
@@ -171,6 +176,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
           stationPtr->is_fully_connected = false;
         }
         break;
+      }
     }
   }
 
@@ -216,7 +222,14 @@ void station_start(StationPtr stationPtr) {
 void station_connect(StationPtr stationPtr) {
   stationPtr->stopping = false;
   ESP_LOGI(LOGGING_TAG, "Connecting to %s...", stationPtr->wifi_config.sta.ssid);
-  ESP_ERROR_CHECK(esp_netif_dhcpc_start(stationPtr->netif));
+  // A failed association can leave DHCP running. Retrying is idempotent.
+  esp_err_t result = esp_netif_dhcpc_start(stationPtr->netif);
+  if (result != ESP_OK && result != ESP_ERR_ESP_NETIF_DHCP_ALREADY_STARTED) {
+    ESP_LOGW(LOGGING_TAG, "Cannot start DHCP: %s", esp_err_to_name(result));
+    stationPtr->ap_found = false;
+    stationPtr->state = s_inactive;
+    return;
+  }
   ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &stationPtr->wifi_config));
   if (!stationPtr->event_handlers_registered) {
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, stationPtr));
@@ -231,9 +244,17 @@ void station_connect(StationPtr stationPtr) {
 
 void station_disconnect(StationPtr stationPtr) {
   stationPtr->stopping = true;
-  if(stationPtr->state == s_active){
-    s_retry_num = MAX_RETRIES;
-    ESP_ERROR_CHECK(esp_wifi_disconnect());
+  bool was_active = stationPtr->state == s_active;
+  client_close();
+  stationPtr->is_fully_connected = false;
+  stationPtr->ap_found = false;
+  stationPtr->state = s_inactive;
+  s_retry_num = 0;
+  if (was_active) {
+    esp_err_t result = esp_wifi_disconnect();
+    if (result != ESP_OK && result != ESP_ERR_WIFI_NOT_STARTED) {
+      ESP_LOGW(LOGGING_TAG, "Cannot disconnect STA: %s", esp_err_to_name(result));
+    }
   }
 }
 
@@ -291,7 +312,7 @@ void transform_wifi_ap_record_to_config(StationPtr stationPtr) {
 }
 
 int8_t station_scan_best_rssi(StationPtr stationPtr) {
-  esp_wifi_scan_start(NULL, true);
+  if (esp_wifi_scan_start(NULL, true) != ESP_OK) return -128;
 
   wifi_ap_record_t ap;
   int8_t best_rssi = -128;  // raw minimum possible RSSI

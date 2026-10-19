@@ -8,4 +8,5 @@ idf_component_register(
     REQUIRES
         routing_config
         ring_share
+        esp_hw_support
 )

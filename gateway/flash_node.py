@@ -111,13 +111,22 @@ def boot_recovery_pending(reply):
     return len(reply.data) >= 51 and bool(reply.data[50])
 
 
+def boot_application_ready(reply):
+    return len(reply.data) < 53 or bool(reply.data[51])
+
+
+def boot_traffic_paused(reply):
+    return len(reply.data) >= 53 and bool(reply.data[52])
+
+
 def format_status(reply):
-    if len(reply.data) not in (50, 51):
+    if len(reply.data) not in (50, 51, 53):
         raise UpdateError("Unsupported INFO response")
     capacity, address = struct.unpack_from("<II", reply.data, 5)
     return (f"{role_names(1 << reply.sender)}: phase={reply.data[4]}, slot={capacity}, "
             f"running=0x{address:x}, pending_verify={reply.data[49]}, "
             f"recovery_pending={int(boot_recovery_pending(reply))}, "
+            f"ready={int(boot_application_ready(reply))}, boot_paused={int(boot_traffic_paused(reply))}, "
             f"session={struct.unpack_from('<I', reply.data, 45)[0]}, "
             f"elf_sha256={reply.data[13:45].hex()}")
 
@@ -238,6 +247,10 @@ class NodeUpdater:
                         reasons.append(f"phase={reply.data[4]}")
                     if reply.data[13:45] != expected_hash:
                         reasons.append("ELF hash mismatch")
+                    if not boot_application_ready(reply):
+                        reasons.append("ready=0")
+                    if boot_traffic_paused(reply):
+                        reasons.append("boot_paused=1 (waiting for ring startup barrier)")
                     if reply.data[49]:
                         reasons.append("pending_verify=1")
                     if boot_recovery_pending(reply):
@@ -278,7 +291,8 @@ class NodeUpdater:
             capacity = struct.unpack_from("<I", reply.data, 5)[0]
             if capacity < len(image):
                 raise UpdateError(f"{role_names(1 << role)}: OTA slot {capacity} bytes, image {len(image)} bytes")
-            if reply.data[4] != IDLE or reply.data[49] or boot_recovery_pending(reply):
+            if (reply.data[4] != IDLE or reply.data[49] or boot_recovery_pending(reply) or
+                    not boot_application_ready(reply) or boot_traffic_paused(reply)):
                 raise UpdateError(f"{role_names(1 << role)} is busy or boot is unconfirmed/recovering. "
                                   "Wait for automatic recovery and inspect --status before retrying")
         self.report(f"Uploading {len(image)} bytes to {role_names(self.roles)}")
@@ -326,11 +340,13 @@ class NodeUpdater:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True, help="Center USB-UART, e.g. COM3 or /dev/ttyUSB0")
-    parser.add_argument("--roles", required=True, type=parse_roles,
+    parser.add_argument("--roles", type=parse_roles,
                         help="All physically present roles, e.g. center,north,south,east,west")
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument("--image", type=Path, help="ESP-IDF application image, normally app/build/main.bin")
     action.add_argument("--status", action="store_true", help="Inspect roles without writing flash")
+    action.add_argument("--local-status", action="store_true",
+                        help="Inspect only the center without using the SPI ring; omit --roles")
     parser.add_argument("--baud", type=int, default=115200, help="Must match firmware UART0 console baud")
     parser.add_argument("--timeout", type=float, default=30, help="ACK timeout per attempt (seconds)")
     parser.add_argument("--retries", type=int, default=3)
@@ -338,6 +354,12 @@ def main():
                         help="Boot verification deadline, including automatic recovery restart (seconds)")
     parser.add_argument("--verbose", action="store_true", help="Show commands, ACKs and firmware logs on stderr")
     args = parser.parse_args()
+    if args.local_status:
+        if args.roles is not None:
+            parser.error("--local-status queries only the center; omit --roles")
+        args.roles = 1 << ROLES["center"]
+    elif args.roles is None:
+        parser.error("--roles is required for --status or --image")
     if args.timeout <= 0 or args.retries < 1 or args.boot_timeout <= 0 or args.baud <= 0:
         parser.error("Timeouts, retries and baud rate must be positive")
     transport = None
@@ -348,7 +370,7 @@ def main():
         trace = (lambda message: print(message, file=sys.stderr, flush=True)) if args.verbose else None
         transport = SerialTransport(args.port, args.baud, log=trace)
         updater = NodeUpdater(transport, args.roles, args.timeout, args.retries, trace=trace)
-        if args.status:
+        if args.status or args.local_status:
             for role, reply in sorted(updater.status().items()):
                 print(format_status(reply))
         else:

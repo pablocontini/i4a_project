@@ -6,7 +6,9 @@
 
 /* Register before starting the ring. Call on every board, using its GPIO role. */
 esp_err_t node_ota_init(ring_share_t *ring, uint8_t role);
-/* Only the center opens UART0; call once node_setup has finished. */
+/* Call on every board after application setup and successful boot confirmation.
+ * Marks application ready; BEGIN remains blocked until the center checks all
+ * five confirmed boards and releases the startup gate. Only the center opens UART0. */
 esp_err_t node_ota_start_serial(void);
 
 typedef void (*node_ota_reply_fn)(const node_ota_packet_t *reply, void *context);

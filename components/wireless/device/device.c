@@ -17,7 +17,8 @@
 
 static const char *LOGGING_TAG = "device";
 static const char *dev_orientation[5] = {"_N_", "_S_", "_E_", "_W_", "_C_"};
-static TaskHandle_t station_task_handle = NULL;  // Tracks STA connect task
+static TaskHandle_t volatile station_task_handle = NULL;
+static volatile bool station_task_stop_requested;
 
 // Function to initialize NVS (non-volatile storage)
 static esp_err_t init_nvs() {
@@ -47,6 +48,9 @@ esp_err_t device_wifi_init() {
   // Initialize Wi-Fi configuration structure
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+
+  // Forwarding stations must receive promptly instead of waiting for DTIM.
+  ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
 
   return ESP_OK;
 }
@@ -96,7 +100,7 @@ void device_init_ap(DevicePtr device_ptr, uint8_t channel, const char *wifi_netw
   ap_init(device_ptr->access_point_ptr, channel, wifi_ssid, password, max_sta_connections, is_center, device_ptr->device_is_apsta);
 };
 
-void device_init_station(DevicePtr device_ptr, const char* wifi_ssid_like, uint16_t orientation, char* device_uuid, const char* password) {
+void device_init_station(DevicePtr device_ptr, const char* wifi_ssid_like, uint16_t orientation, const char* device_uuid, const char* password) {
   station_init(device_ptr->station_ptr, wifi_ssid_like, orientation, device_uuid, password, device_ptr->device_is_apsta);
 };
 
@@ -167,6 +171,23 @@ void device_start_station(DevicePtr device_ptr) {
   }
 };
 
+/* Leave scans and neighbor-manager calls normally so their locks are released. */
+static bool device_station_wait(uint32_t milliseconds) {
+  while (milliseconds && !station_task_stop_requested) {
+    uint32_t slice = milliseconds > 100 ? 100 : milliseconds;
+    vTaskDelay(pdMS_TO_TICKS(slice));
+    milliseconds -= slice;
+  }
+  return !station_task_stop_requested;
+}
+
+static void device_stop_station_task(void) {
+  station_task_stop_requested = true;
+  while (station_task_handle != NULL) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+}
+
 static void device_connect_station_task(void* arg) {
   DevicePtr device_ptr = (DevicePtr)arg;  // Get the device pointer from the task argument
 
@@ -175,70 +196,64 @@ static void device_connect_station_task(void* arg) {
 
   // Start priority determination sequence
   int8_t scan_rssi = station_scan_best_rssi(device_ptr->station_ptr);
+  if (station_task_stop_requested) goto stopped;
   pm_provide_to_siblings(scan_rssi);
-  vTaskDelay(pdMS_TO_TICKS(1000 * RSSI_PRIORITY_SCAN_INTERVAL_SECS));
+  if (!device_station_wait(1000 * RSSI_PRIORITY_SCAN_INTERVAL_SECS)) goto stopped;
 
   uint8_t orientation_priority = pm_get_suggested_priority();
   uint8_t shifted_priorities = (device_ptr->device_orientation - orientation_priority + 4) % 4;
 
   // Wait in intervals of 10 seconds to avoid simultaneous node connection
-  vTaskDelay(pdMS_TO_TICKS(shifted_priorities * 1000 * STA_PRIORITY_WAIT_INTERVAL_SECS));
+  if (!device_station_wait(shifted_priorities * 1000 * STA_PRIORITY_WAIT_INTERVAL_SECS)) goto stopped;
 
-  while (1) {
+  while (!station_task_stop_requested) {
     if (device_ptr->sta_lock) {
-      vTaskDelay(pdMS_TO_TICKS(60000)); // STA disabled, long sleep
+      device_station_wait(60000);
       continue;
     }
 
     if (!station_is_active(device_ptr->station_ptr)) {
       ESP_LOGI(LOGGING_TAG, "Wi-Fi not connected. Scanning for APs...");
       station_find_ap(device_ptr->station_ptr);
+      if (station_task_stop_requested) break;
 
-      if (station_found_ap(device_ptr->station_ptr)) {
+      if (!device_ptr->sta_lock && station_found_ap(device_ptr->station_ptr)) {
         ESP_LOGI(LOGGING_TAG, "Wi-Fi found! Connecting...");
         station_connect(device_ptr->station_ptr);
       } else {
         ESP_LOGE(LOGGING_TAG, "No Wi-Fi found. Re-scanning in 10s...");
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        device_station_wait(10000);
       }
     } else {
       // Connected, sleep to reduce CPU usage
-      vTaskDelay(pdMS_TO_TICKS(10000));
+      device_station_wait(10000);
     }
   }
 
-  // Task deletion handled externally
+stopped:
   station_task_handle = NULL;
   vTaskDelete(NULL);
 
 }
 
 void device_connect_station(DevicePtr device_ptr) {
-  // Kill old STA task if it exists
-  if (station_task_handle != NULL) {
-    ESP_LOGI(LOGGING_TAG, "Killing previous STA connect task");
-    vTaskDelete(station_task_handle);
-    station_task_handle = NULL;
-  }
+  device_stop_station_task();
+  station_task_stop_requested = false;
 
   // Create new STA connect task
-  xTaskCreatePinnedToCore(
+  ESP_ERROR_CHECK(xTaskCreatePinnedToCore(
     device_connect_station_task,
     "device_connect_station_task",
     TASK_DEVICE_STACK,
     device_ptr,
     TASK_DEVICE_PRIORITY,
-    &station_task_handle,
+    (TaskHandle_t *)&station_task_handle,
     TASK_DEVICE_CORE
-  );
+  ) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
 }
 
 void device_disconnect_station(DevicePtr device_ptr) {
-  if (station_task_handle != NULL) {
-    ESP_LOGI(LOGGING_TAG, "Stopping STA connect task");
-    vTaskDelete(station_task_handle);
-    station_task_handle = NULL;
-  }
+  device_stop_station_task();
 
   station_disconnect(device_ptr->station_ptr);
 }
@@ -278,16 +293,38 @@ bool device_send_wireless_message(DevicePtr device_ptr, const uint8_t *msg, uint
   return false;
 }
 
+static bool device_subnet_is_valid(uint32_t subnet, uint32_t mask) {
+  uint32_t host_bits = ~mask;
+  return mask != 0 && (host_bits & (host_bits + 1)) == 0 && (subnet & mask) == subnet;
+}
+
 bool device_is_point_to_point_message(DevicePtr device_ptr, uint32_t dst) {
+  if (!device_ptr || device_ptr->state != d_active) return false;
   if(device_ptr->mode == AP){
-    return ((dst & device_ptr->access_point_ptr->ap_mask) == device_ptr->access_point_ptr->ap_subnet);
+    AccessPointPtr ap = device_ptr->access_point_ptr;
+    return ap && ap->initialized && ap->netif && ap->state == active && !ap->stopping &&
+           device_subnet_is_valid(ap->ap_subnet, ap->ap_mask) &&
+           (dst & ap->ap_mask) == ap->ap_subnet;
   }
 
   if(device_ptr->mode == STATION){
-    return ((dst & device_ptr->station_ptr->sta_mask) == device_ptr->station_ptr->sta_subnet);
+    StationPtr station = device_ptr->station_ptr;
+    return station && station->initialized && station->netif &&
+           station->state == s_active && station->is_fully_connected && !station->stopping &&
+           device_subnet_is_valid(station->sta_subnet, station->sta_mask) &&
+           (dst & station->sta_mask) == station->sta_subnet;
   }
 
   return false;
+}
+
+bool device_ap_can_search(DevicePtr device_ptr) {
+  if (!device_ptr || device_ptr->mode != AP || device_ptr->state != d_active) return false;
+  AccessPointPtr ap = device_ptr->access_point_ptr;
+  if (!ap || !ap->initialized || !ap->netif || ap->state != active || ap->stopping || ap->server_is_up)
+    return false;
+  wifi_sta_list_t stations = {0};
+  return esp_wifi_ap_get_sta_list(&stations) == ESP_OK && stations.num == 0;
 }
 
 // Device RSSI

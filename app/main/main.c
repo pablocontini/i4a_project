@@ -17,6 +17,7 @@
 #include "node.h"
 #include "node_ota/node_ota.h"
 #include "neighbor_manager/neighbor_manager.h"
+#include "capture_diagnostics.h"
 
 #define ROOT_NETWORK 0x0A000000  // 10.0.0.0
 #define ROOT_MASK 0xFF000000 // 255.0.0.0
@@ -57,9 +58,6 @@ void app_main(void) {
     node_ota_boot_trace("node_setup.begin");
     node_setup();
     node_ota_boot_trace("node_setup.end");
-    node_ota_boot_trace("serial.begin");
-    ESP_ERROR_CHECK(node_ota_start_serial());
-    node_ota_boot_trace("serial.end");
 
     wireless_t *wl = node_get_wireless_instance();
     ring_share_t *rs = node_get_rs_instance();
@@ -69,9 +67,12 @@ void app_main(void) {
 
     ESP_ERROR_CHECK(nm_init(rs, orientation, node_get_uuid()) ? ESP_OK : ESP_ERR_NO_MEM);
 
-    sync_init(&_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET);
-    ss_init(&ss, &_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET);
-    rt_create(rt, rs, wl, &_sync, &ss, orientation + ROUTING_ORIENTATION_OFFSET);
+    ESP_ERROR_CHECK(sync_init(&_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET)
+                    ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_ERROR_CHECK(ss_init(&ss, &_sync, rs, orientation + ROUTING_ORIENTATION_OFFSET)
+                    ? ESP_OK : ESP_ERR_NO_MEM);
+    ESP_ERROR_CHECK(rt_create(rt, rs, wl, &_sync, &ss, orientation + ROUTING_ORIENTATION_OFFSET)
+                    ? ESP_OK : ESP_ERR_NO_MEM);
 
     if(orientation == NODE_DEVICE_ORIENTATION_CENTER){
         if(is_center_root){
@@ -118,6 +119,11 @@ void app_main(void) {
     ESP_ERROR_CHECK(routing_started == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
     node_ota_boot_trace("routing_task.end");
     ESP_ERROR_CHECK(node_ota_confirm_boot());
+    ESP_ERROR_CHECK(capture_diagnostics_start(rt));
     node_ota_boot_trace("app_main.ready");
+    /* Enable updates only after routing, Wi-Fi and boot confirmation finish. */
+    node_ota_boot_trace("serial.begin");
+    ESP_ERROR_CHECK(node_ota_start_serial());
+    node_ota_boot_trace("serial.end");
 
 }

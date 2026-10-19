@@ -54,6 +54,14 @@ esp_err_t spi_init(QueueHandle_t **rx_queue);
 esp_err_t spi_transmit(void *p, size_t len);
 esp_err_t spi_free_rx_buffer(void *p);
 
+typedef struct {
+    uint32_t rx_complete, rx_short, rx_no_buffer, rx_queue_full;
+    uint32_t tx, tx_fail;
+    /* Capture diagnostics only: copies inspected before DMA is rearmed. */
+    uint32_t rx_crc_checked, rx_crc_error;
+} spi_diagnostics_t;
+void spi_get_diagnostics(spi_diagnostics_t *out);
+
 
 #ifdef __cplusplus
 }

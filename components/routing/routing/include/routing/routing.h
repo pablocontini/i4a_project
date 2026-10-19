@@ -51,6 +51,13 @@ typedef struct routing {
      */
     rt_internal_queue_t internal_queue;
 
+    /* Producers run in the Wi-Fi and SPI tasks. Never hold this mutex while
+     * calling a role callback, sending a message, or requesting a token. */
+    mutex_t queue_lock;
+    uint32_t pending_tick_ms;
+    /* Written only in the routing critical section. */
+    bool pending_publish;
+
     /**
      * Private internal device state and role definition.
      */

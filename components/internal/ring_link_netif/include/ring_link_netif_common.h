@@ -50,6 +50,13 @@ esp_netif_t* ring_link_netif_new(const esp_netif_config_t* config);
 
 esp_err_t ring_link_netif_esp_netif_attach(esp_netif_t *esp_netif, esp_err_t (*post_attach_callback)(esp_netif_t *, void *));
 
+/* Validate the IP packet against the physical frame before allocating/copying. */
+bool ring_link_netif_ip_length(const ring_link_payload_t *payload, uint16_t *length);
+
+/* The physical driver consumes the frame synchronously; no MTU-sized frame is
+ * placed on lwIP's TCP/IP task stack. */
+esp_err_t ring_link_netif_transmit(const void *buffer, size_t len, ring_link_payload_id_t id);
+
 #ifdef __cplusplus
 }
 #endif

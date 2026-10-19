@@ -17,6 +17,9 @@ extern "C" {
 #endif
 
 esp_err_t ring_link_internal_init(QueueHandle_t **queue);
+/* Route after CRC validation and before local queue admission. The caller
+ * retains buffer ownership; deliver_local selects whether to enqueue it. */
+esp_err_t ring_link_internal_route(ring_link_payload_t *p, bool *deliver_local);
 esp_err_t ring_link_internal_process(ring_link_payload_t *p);
 
 #ifdef __cplusplus

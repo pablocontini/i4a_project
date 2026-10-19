@@ -1,7 +1,9 @@
 #include "spi.h"
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "task_config.h"
+#include "esp_intr_alloc.h"
 
 #include "ring_link_payload.h"
 
@@ -12,41 +14,78 @@ static const char* TAG = "==> SPI";
 #define NUM_BUFFERS  8
 
 DMA_ATTR static ring_link_payload_t buffer_pool[NUM_BUFFERS] __attribute__((aligned(4)));  // Buffers preasignados
+/* Application consumers must never own a DMA receive buffer: retaining one
+ * used to prevent rearming that transaction until the consumer returned it. */
+static ring_link_payload_t delivery_pool[NUM_BUFFERS];
+static portMUX_TYPE diagnostics_lock = portMUX_INITIALIZER_UNLOCKED;
+static spi_diagnostics_t diagnostics;
+
+void spi_get_diagnostics(spi_diagnostics_t *out) {
+    portENTER_CRITICAL(&diagnostics_lock);
+    *out = diagnostics;
+    portEXIT_CRITICAL(&diagnostics_lock);
+}
 static QueueHandle_t free_buf_queue = NULL;       // Buffers libres
 static QueueHandle_t spi_rx_queue = NULL;         // Mensajes recibidos
 
-static void spi_polling_task(void *pvParameters) {
-    ring_link_payload_t *payload;
+/* Descriptors outlive the task iteration and stay valid while the driver owns
+ * them. All eight DMA buffers are queued, instead of rearming one transaction
+ * only after the polling task runs again. No application callback runs in ISR. */
+static spi_slave_transaction_t rx_transactions[NUM_BUFFERS];
 
-    while (1) {
-        // Esperar un buffer libre del pool
-        if (xQueueReceive(free_buf_queue, &payload, portMAX_DELAY) != pdTRUE) continue;
-
-        spi_slave_transaction_t t = { 0 };
-        t.length = SPI_BUFFER_SIZE * 8;
-        t.rx_buffer = payload;
-
-        esp_err_t ret = spi_slave_transmit(SPI_RECEIVER_HOST, &t, portMAX_DELAY);
-        if (ret != ESP_OK) {
-            // Si hubo error, devolver el buffer al pool
-            ESP_LOGE(TAG, "Failed to spi_slave_queue_trans");
-            xQueueSend(free_buf_queue, &payload, 0);
-        }
-        taskYIELD();
-    }
+static void queue_rx(spi_slave_transaction_t *transaction, ring_link_payload_t *payload)
+{
+    memset(transaction, 0, sizeof(*transaction));
+    transaction->length = SPI_BUFFER_SIZE * 8;
+    transaction->rx_buffer = payload;
+    ESP_ERROR_CHECK(spi_slave_queue_trans(SPI_RECEIVER_HOST, transaction, portMAX_DELAY));
 }
 
-void IRAM_ATTR spi_post_trans_cb(spi_slave_transaction_t *trans) {
-    ring_link_payload_t *payload = (ring_link_payload_t *) trans->rx_buffer;
-
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
-    if (xQueueSendFromISR(spi_rx_queue, &payload, &xHigherPriorityTaskWoken) != pdTRUE) {
-        // Cola llena, descartar el mensaje (¡devolver buffer!)
-        xQueueSendFromISR(free_buf_queue, &payload, &xHigherPriorityTaskWoken);
+static void spi_polling_task(void *pvParameters) {
+    (void)pvParameters;
+    for (unsigned i = 0; i < NUM_BUFFERS; ++i) queue_rx(&rx_transactions[i], &buffer_pool[i]);
+    printf("\nI4ASPI event=rx_ready queued=%u iram=1\n", NUM_BUFFERS);
+    for (;;) {
+        spi_slave_transaction_t *completed;
+        ESP_ERROR_CHECK(spi_slave_get_trans_result(SPI_RECEIVER_HOST, &completed, portMAX_DELAY));
+        ring_link_payload_t *payload = completed->rx_buffer;
+        ring_link_payload_t *delivery = NULL;
+        bool short_frame = completed->trans_len != sizeof(*payload) * 8;
+        bool no_buffer = false, queue_full = false;
+#if CONFIG_I4A_CAPTURE_DIAGNOSTICS
+        bool crc_checked = false, crc_error = false;
+#endif
+        /* Never deliver a truncated/stale DMA buffer as a complete frame. */
+        if (!short_frame) {
+            if (xQueueReceive(free_buf_queue, &delivery, 0) == pdTRUE) {
+                memcpy(delivery, payload, sizeof(*delivery));
+#if CONFIG_I4A_CAPTURE_DIAGNOSTICS
+                /* Inspect the application copy before rearming DMA, while no
+                 * consumer can touch it. This observation never changes the
+                 * existing CRC rejection performed by ring ingress. */
+                crc_checked = true;
+                crc_error = ring_link_compute_crc32(delivery) != delivery->crc32;
+#endif
+            } else no_buffer = true;
+        }
+        /* Rearm the same DMA buffer before exposing the separate copy. A full
+         * application pool drops one delivery, never waits to receive again. */
+        queue_rx(completed, payload);
+        if (delivery && xQueueSend(spi_rx_queue, &delivery, 0) != pdTRUE) {
+            queue_full = true;
+            xQueueSend(free_buf_queue, &delivery, 0);
+        }
+        portENTER_CRITICAL(&diagnostics_lock);
+        ++diagnostics.rx_complete;
+        diagnostics.rx_short += short_frame;
+        diagnostics.rx_no_buffer += no_buffer;
+        diagnostics.rx_queue_full += queue_full;
+#if CONFIG_I4A_CAPTURE_DIAGNOSTICS
+        diagnostics.rx_crc_checked += crc_checked;
+        diagnostics.rx_crc_error += crc_error;
+#endif
+        portEXIT_CRITICAL(&diagnostics_lock);
     }
-
-    if (xHigherPriorityTaskWoken) portYIELD_FROM_ISR();
 }
 
 static esp_err_t spi_rx_init() {
@@ -57,6 +96,7 @@ static esp_err_t spi_rx_init() {
         .sclk_io_num=SPI_RECEIVER_GPIO_SCLK,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
+        .intr_flags = ESP_INTR_FLAG_IRAM,
     };
 
     //Configuration for the SPI slave interface
@@ -65,8 +105,7 @@ static esp_err_t spi_rx_init() {
         .spics_io_num=SPI_RECEIVER_GPIO_CS,
         .queue_size=SPI_QUEUE_SIZE,
         .flags=0,
-        //.post_setup_cb=spi_post_setup_cb,
-        .post_trans_cb=spi_post_trans_cb
+        .post_trans_cb=NULL
     };
 
     //Initialize SPI slave interface
@@ -120,11 +159,13 @@ esp_err_t spi_init(QueueHandle_t **rx_queue) {
 
     // Inicializar pool de buffers
     for (int i = 0; i < NUM_BUFFERS; i++) {
-        ring_link_payload_t *ptr = &buffer_pool[i];
+        ring_link_payload_t *ptr = &delivery_pool[i];
         xQueueSend(free_buf_queue, &ptr, 0);
     }
     // inicializo tarea de polling
-    xTaskCreatePinnedToCore(spi_polling_task, "spi_polling_task", TASK_SPI_STACK, NULL, TASK_SPI_PRIORITY, NULL, TASK_SPI_CORE);
+    if (xTaskCreatePinnedToCore(spi_polling_task, "spi_polling_task", TASK_SPI_STACK, NULL,
+                                TASK_SPI_PRIORITY, NULL, TASK_SPI_CORE) != pdPASS)
+        return ESP_ERR_NO_MEM;
 
     return ESP_OK;
 }
@@ -139,7 +180,12 @@ esp_err_t spi_transmit(void *p, size_t len) {
         .length = len * 8,
         .tx_buffer = p,
     };
-    return spi_device_transmit(s_spi_device_handle, &t);
+    esp_err_t result = spi_device_transmit(s_spi_device_handle, &t);
+    portENTER_CRITICAL(&diagnostics_lock);
+    ++diagnostics.tx;
+    diagnostics.tx_fail += result != ESP_OK;
+    portEXIT_CRITICAL(&diagnostics_lock);
+    return result;
 }
 
 esp_err_t spi_free_rx_buffer(void *p)

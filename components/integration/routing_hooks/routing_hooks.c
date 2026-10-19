@@ -27,15 +27,32 @@ static routing_hook_func_t routing_hooks[ROUTING_HOOK_COUNT] = {
     [ROUTING_HOOK_CUSTOM] = routing_hook_custom
 };
 
+static err_t discard_output(struct netif *netif, struct pbuf *packet, const ip4_addr_t *destination)
+{
+    (void)netif;
+    (void)packet;
+    (void)destination;
+    return ERR_RTE;
+}
+
+/* NULL means "let lwIP choose another route", including its default SPI
+ * interface. An explicit no-route decision must instead fail transmission. */
+static struct netif discard_netif = {
+    .name = { 'd', 'r' },
+    .flags = NETIF_FLAG_UP | NETIF_FLAG_LINK_UP,
+    .mtu = UINT16_MAX,
+    .output = discard_output,
+};
+
 // Called by lwIP in TCP/IP context. Destruction withdraws the published
 // Wi-Fi handle in the same context before freeing it.
 static struct netif *ready_netif(esp_netif_t *handle) {
     if (!handle) {
-        return NULL;
+        return &discard_netif;
     }
     struct netif *netif = esp_netif_get_netif_impl(handle);
     if (!netif || !netif_is_up(netif) || !netif->output) {
-        return NULL;
+        return &discard_netif;
     }
     return netif;
 }
@@ -77,8 +94,8 @@ static struct netif *routing_hook_forwarder(uint32_t src_ip, uint32_t dst_ip) {
         return ready_netif(node_get_spi_netif());
     }
 
-    ESP_LOGD(TAG, "Decision: routing result -> unknown -> returning NULL");
-    return NULL;
+    ESP_LOGD(TAG, "Decision: no available route -> discard");
+    return &discard_netif;
 }
 
 static struct netif *routing_hook_home(uint32_t src_ip, uint32_t dst_ip) {
@@ -96,20 +113,7 @@ static struct netif *routing_hook_home(uint32_t src_ip, uint32_t dst_ip) {
 static struct netif *routing_hook_default(uint32_t src_ip, uint32_t dst_ip) {
     ESP_LOGD(TAG, "Routing Hook: DEFAULT called");
 
-    esp_netif_t *spi = node_get_spi_netif();
-    if (!spi) {
-        ESP_LOGD(TAG, "SPI netif not ready -> returning NULL");
-        return NULL;
-    }
-
-    struct netif *lwip_netif = ready_netif(spi);
-    if (!lwip_netif) {
-        ESP_LOGD(TAG, "SPI netif implementation not ready -> returning NULL");
-        return NULL;
-    }
-
-    ESP_LOGD(TAG, "SPI netif implementation ready -> use SPI netif");
-    return lwip_netif;
+    return ready_netif(node_get_spi_netif());
 }
 
 static struct netif *routing_hook_custom(uint32_t src_ip, uint32_t dst_ip) {

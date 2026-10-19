@@ -13,23 +13,26 @@
 #include "wireless/wireless.h"
 
 #define NODE_STARTUP_DELAY_SECONDS 10
+#define ROUTING_TAG "routing"
 
 static void on_sibling_message(void *ctx, const uint8_t *raw_event, uint16_t len) {
     routing_t *self = ctx;
     rt_internal_queue_t *queue = &self->internal_queue;
-
-    if (queue->count >= MAX_SIBL_EVENT_QUEUED) {
-        os_panic("Maximum number of sibling messages queued reached (%zu) -- aborting", queue->count);
-        return;
-    }
 
     if (sizeof(rt_sibl_event_t) != len) {
         os_panic("Invalid sibling message received (len = %u, expected = %zu)", len, sizeof(rt_sibl_event_t));
         return;
     }
 
-    memcpy(&queue->queue[queue->count], raw_event, sizeof(rt_sibl_event_t));
-    queue->count++;
+    bool queued = false;
+    WITH_LOCK(&self->queue_lock, {
+        if (queue->count < MAX_SIBL_EVENT_QUEUED) {
+            memcpy(&queue->queue[queue->count++], raw_event, sizeof(rt_sibl_event_t));
+            queued = true;
+        }
+    });
+    if (!queued)
+        log_warn(ROUTING_TAG, "Sibling routing queue full; dropping incoming event");
 
     sync_request_critical_section(self->deps.sync, RS_ROUTING);
 }
@@ -37,10 +40,44 @@ static void on_sibling_message(void *ctx, const uint8_t *raw_event, uint16_t len
 static void on_critical_section(void *ctx) {
     routing_t *self = ctx;
 
+    /* Do not apply another transaction until siblings have received the
+     * preceding routing table. The next token retries a failed publication. */
+    bool pending_publish = false;
+    WITH_LOCK(&self->queue_lock, { pending_publish = self->pending_publish; });
+    if (pending_publish) {
+        if (ss_refresh(self->deps.ss, RS_ROUTING)) {
+            WITH_LOCK(&self->queue_lock, { self->pending_publish = false; });
+        } else {
+            sync_defer_critical_section(self->deps.sync, RS_ROUTING);
+        }
+        /* One token may publish only one table version for this owner. Leave
+         * queued events for the next circulation after this replay succeeds. */
+        return;
+    }
+
+    /* Consume only the batch present at entry. New arrivals stay queued for
+     * the next token instead of being erased when this callback finishes.
+     * Copy one event at a time to keep the SPI callback's stack bounded. */
+    size_t sibling_count = 0, peer_count = 0;
+    uint32_t tick_ms = 0;
+    WITH_LOCK(&self->queue_lock, {
+        sibling_count = self->internal_queue.count;
+        peer_count = self->external_queue.count;
+        tick_ms = self->pending_tick_ms;
+        self->pending_tick_ms = 0;
+    });
+
     // Dispatch sibling messages first
     rt_internal_queue_t *internal_queue = &self->internal_queue;
-    for (size_t i = 0; i < internal_queue->count; i++) {
-        const rt_sibl_event_t *ev = &internal_queue->queue[i];
+    for (size_t i = 0; i < sibling_count; i++) {
+        rt_sibl_event_t event;
+        WITH_LOCK(&self->queue_lock, {
+            event = internal_queue->queue[0];
+            --internal_queue->count;
+            memmove(internal_queue->queue, internal_queue->queue + 1,
+                    internal_queue->count * sizeof(event));
+        });
+        const rt_sibl_event_t *ev = &event;
         switch (ev->event_id) {
             case SIBL_ON_START:
                 if (self->role.impl.on_start)
@@ -70,8 +107,15 @@ static void on_critical_section(void *ctx) {
 
     // Dispatch peer messages after sibling messages
     rt_external_queue_t *external_queue = &self->external_queue;
-    for (size_t i = 0; i < external_queue->count; i++) {
-        const rt_peer_event_t *ev = &external_queue->queue[i];
+    for (size_t i = 0; i < peer_count; i++) {
+        rt_peer_event_t event;
+        WITH_LOCK(&self->queue_lock, {
+            event = external_queue->queue[0];
+            --external_queue->count;
+            memmove(external_queue->queue, external_queue->queue + 1,
+                    external_queue->count * sizeof(event));
+        });
+        const rt_peer_event_t *ev = &event;
         switch (ev->event_id) {
             case PEER_HANDSHAKE:
                 if (self->role.impl.on_peer_handshake)
@@ -103,21 +147,52 @@ static void on_critical_section(void *ctx) {
         }
     }
 
-    // Clear queues
-    external_queue->count = 0;
-    internal_queue->count = 0;
+    if (tick_ms && self->role.impl.on_tick)
+        self->role.impl.on_tick(self, tick_ms);
+
+    WITH_LOCK(&self->queue_lock, { pending_publish = self->pending_publish; });
+    if (pending_publish) {
+        if (ss_refresh(self->deps.ss, RS_ROUTING)) {
+            WITH_LOCK(&self->queue_lock, { self->pending_publish = false; });
+        } else {
+            sync_defer_critical_section(self->deps.sync, RS_ROUTING);
+        }
+    }
 }
 
 static void queue_peer_message(routing_t *self, const rt_peer_event_t *event) {
     rt_external_queue_t *queue = &self->external_queue;
 
-    if (queue->count >= MAX_PEER_EVENT_QUEUED) {
-        os_panic("Maximum number of peer messages queued reached (%zu) -- aborting\n", queue->count);
-        return;
-    }
-
-    memcpy(&queue->queue[queue->count], event, sizeof(rt_peer_event_t));
-    queue->count++;
+    bool queued = false;
+    bool evicted = false;
+    WITH_LOCK(&self->queue_lock, {
+        if (queue->count == MAX_PEER_EVENT_QUEUED && event->event_id == PEER_LOST) {
+            /* Losing a control message is preferable to retaining a gateway
+             * through a disconnected peer. Keep lifecycle events in order;
+             * when all entries are lifecycle events, the newest LOST still
+             * determines the final disconnected state. */
+            size_t discard = 0;
+            for (size_t i = 0; i < queue->count; ++i) {
+                if (queue->queue[i].event_id != PEER_CONNECTED &&
+                    queue->queue[i].event_id != PEER_LOST) {
+                    discard = i;
+                    break;
+                }
+            }
+            --queue->count;
+            memmove(&queue->queue[discard], &queue->queue[discard + 1],
+                    (queue->count - discard) * sizeof(*event));
+            evicted = true;
+        }
+        if (queue->count < MAX_PEER_EVENT_QUEUED) {
+            memcpy(&queue->queue[queue->count++], event, sizeof(rt_peer_event_t));
+            queued = true;
+        }
+    });
+    if (evicted)
+        log_warn(ROUTING_TAG, "Peer routing queue full; evicted older event to preserve link loss");
+    if (!queued)
+        log_warn(ROUTING_TAG, "Peer routing queue full; dropping incoming event");
     sync_request_critical_section(self->deps.sync, RS_ROUTING);
 }
 
@@ -163,6 +238,10 @@ bool rt_create(
 
     if (!mutex_create(&self->node_state.m_lock))
         return false;
+    if (!mutex_create(&self->queue_lock)) {
+        mutex_destroy(&self->node_state.m_lock);
+        return false;
+    }
 
     self->deps = (rt_dependencies_t){
         .rs = rs,
@@ -213,8 +292,11 @@ void rt_on_start(routing_t *self) {
     // Put the first message in the internal queue
     rt_internal_queue_t *queue = &self->internal_queue;
     rt_sibl_event_t start = { .event_id = SIBL_ON_START };
-    memcpy(&queue->queue[0], &start, sizeof(rt_sibl_event_t));
-    queue->count = 1;
+    WITH_LOCK(&self->queue_lock, {
+        /* Keep Wi-Fi events that arrived before startup registration. */
+        if (queue->count < MAX_SIBL_EVENT_QUEUED)
+            memcpy(&queue->queue[queue->count++], &start, sizeof(start));
+    });
 
     // Register the component after putting the message to avoid race conditions
     rs_register_component(
@@ -232,7 +314,10 @@ rt_routing_result_t rt_do_route(routing_t *self, uint32_t src_ip, uint32_t dst_i
     (void)src_ip;
 
     orientation_t output;
-    WITH_LOCK(self->node_state.m_lock, { output = routing_table_route(&self->node_state.routing_table, dst_ip); });
+    WITH_LOCK(&self->node_state.m_lock, { output = routing_table_route(&self->node_state.routing_table, dst_ip); });
+
+    if (output < ORIENTATION_NORTH || output > ORIENTATION_CENTER)
+        return ROUTE_NONE;
 
     if (output == self->orientation)
         return ROUTE_WIFI;
@@ -241,12 +326,26 @@ rt_routing_result_t rt_do_route(routing_t *self, uint32_t src_ip, uint32_t dst_i
 }
 
 void rt_on_tick(routing_t *self, uint32_t dt_ms) {
-    if (self->role.impl.on_tick)
-        self->role.impl.on_tick(self, dt_ms);
+    sync_on_tick(self->deps.sync, dt_ms);
+    bool pending = false;
+    WITH_LOCK(&self->queue_lock, {
+        if (self->role.impl.on_tick) {
+            if (UINT32_MAX - self->pending_tick_ms < dt_ms)
+                self->pending_tick_ms = UINT32_MAX;
+            else
+                self->pending_tick_ms += dt_ms;
+        }
+        pending = self->pending_tick_ms || self->internal_queue.count ||
+                  self->external_queue.count || self->pending_publish;
+    });
+    /* A dropped token request must not strand a nonempty queue forever. */
+    if (pending)
+        sync_request_critical_section(self->deps.sync, RS_ROUTING);
 }
 
 void rt_destroy(routing_t *self) {
-    mutex_destroy(self->node_state.m_lock);
+    mutex_destroy(&self->queue_lock);
+    mutex_destroy(&self->node_state.m_lock);
 }
 
 

@@ -72,6 +72,10 @@
 
 // Routing tasks
 
+#define TASK_NEIGHBOR_CORE           0
+#define TASK_NEIGHBOR_STACK          4096
+#define TASK_NEIGHBOR_PRIORITY       LOW_PRIORITY
+
 #define TASK_ROUTING_CORE           0
 #define TASK_ROUTING_STACK          4096
 #define TASK_ROUTING_PRIORITY       LOW_PRIORITY

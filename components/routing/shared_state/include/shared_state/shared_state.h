@@ -24,6 +24,8 @@ typedef struct shared_state {
     mutex_t broadcast_lock;
     uint8_t orientation;
     shared_data_t data[RS_LAST_COMPONENT_ID];
+    uint32_t sequence[RS_LAST_COMPONENT_ID];
+    uint8_t owner[RS_LAST_COMPONENT_ID];
 } shared_state_t;
 
 /**
@@ -36,18 +38,18 @@ bool ss_init(shared_state_t *ss, sync_t *sync, ring_share_t *rs, orientation_t o
 /**
  * Register an opaque pointer to be watched and copied to all other devices.
  *
- * IMPORTANT: The component that's syncing data must be inside the critical
- * section while calling this method. Otherwise the method will abort.
+ * Register during initialization, before requesting a token for this component.
  */
 void ss_watch(shared_state_t *ss, component_id_t component, shared_data_t data);
 
 /**
  * Refreshes the watched data in all the other devices.
  *
- * IMPORTANT: The component that's syncing data must be inside the critical
- * section while calling this method. Otherwise the method will abort.
+ * The caller must be inside its critical section. Returns false if that
+ * condition is unmet or the publication fails. Keep the dirty state and
+ * defer the critical section before allowing the token to advance on failure.
  */
-void ss_refresh(shared_state_t *ss, component_id_t component);
+bool ss_refresh(shared_state_t *ss, component_id_t component);
 
 /**
  * Free resources used by this component.

@@ -25,5 +25,8 @@ La telemetría usa JSON sobre UDP hacia `10.255.255.254:8000` y se recibe median
 [`gateway/info_server.py`](../gateway/info_server.py). Se conservan la difusión
 interna cada 5 minutos y el envío al gateway cada minuto.
 
+La recuperación de la ruta por defecto y sus pruebas se describen en
+[recuperación de la salida a internet](gateway-route-recovery.md).
+
 Ver [README](../README.md), [contexto del repositorio](../auxiliar/contexto_repo.md)
 y [alcance de la integración](comnetar-integration.md).

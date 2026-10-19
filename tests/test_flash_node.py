@@ -191,6 +191,36 @@ class UploadTests(unittest.TestCase):
                 self.updater(transport).update(image_bytes(), boot_timeout=24)
         self.assertEqual(clock.now, 24)
 
+    def test_boot_barrier_blocks_upload_until_ready_and_released(self):
+        for ready, paused in ((0, 0), (1, 1)):
+            with self.subTest(ready=ready, paused=paused):
+                transport = FakeNode()
+                original_send = transport.send
+                def send(request):
+                    original_send(request)
+                    transport.queue = [ota.Packet(p.op, p.targets, p.sender, p.session,
+                        p.sequence, p.offset, p.data + bytes((0, ready, paused)))
+                        for p in transport.queue]
+                transport.send = send
+                with self.assertRaisesRegex(ota.UpdateError, "busy or boot is unconfirmed"):
+                    self.updater(transport).update(image_bytes())
+                self.assertEqual([p.op for p in transport.sent], [ota.INFO])
+
+    def test_matching_firmware_with_boot_barrier_is_not_success(self):
+        transport = FakeNode()
+        original_send = transport.send
+        def send(request):
+            original_send(request)
+            transport.queue = [ota.Packet(p.op, p.targets, p.sender, p.session,
+                p.sequence, p.offset, p.data + bytes((0, 1, int(transport.booted))))
+                for p in transport.queue]
+        transport.send = send
+        clock = FakeClock()
+        with patch.object(ota.time, "monotonic", clock.monotonic), patch.object(ota.time, "sleep", clock.sleep):
+            with self.assertRaisesRegex(ota.UpdateError, "north: boot_paused=1"):
+                self.updater(transport).update(image_bytes(), boot_timeout=24)
+        self.assertEqual(clock.now, 24)
+
     @patch.object(ota.time, "sleep")
     def test_full_flow_verifies_boot_and_preserves_image(self, _sleep):
         transport = FakeNode()
@@ -419,6 +449,43 @@ class UploadTests(unittest.TestCase):
 
 
 class CliTests(unittest.TestCase):
+    def test_local_status_reads_only_center_without_spi_inventory(self):
+        transport = FakeNode()
+        transport.close = Mock()
+        stdout = io.StringIO()
+        with patch.object(ota, "SerialTransport", return_value=transport), \
+                patch.object(sys, "argv", ["flash_node.py", "--port", "COM5", "--local-status"]), \
+                patch.object(sys, "stdout", stdout):
+            self.assertEqual(ota.main(), 0)
+        self.assertEqual(len(transport.sent), 1)
+        self.assertEqual(transport.sent[0].op, ota.INFO)
+        self.assertEqual(transport.sent[0].targets, 1 << ota.ROLES["center"])
+        self.assertIn("center: phase=0", stdout.getvalue())
+        self.assertNotIn("north:", stdout.getvalue())
+        transport.close.assert_called_once()
+
+    def test_local_status_cannot_be_combined_with_upload_or_inventory(self):
+        for extra in (("--image", "unused.bin"), ("--roles", "center,north")):
+            with self.subTest(extra=extra), \
+                    patch.object(ota, "SerialTransport") as serial, \
+                    patch.object(sys, "argv", ["flash_node.py", "--port", "COM5", "--local-status", *extra]), \
+                    patch.object(sys, "stderr", io.StringIO()):
+                with self.assertRaises(SystemExit) as exc:
+                    ota.main()
+                self.assertEqual(exc.exception.code, 2)
+                serial.assert_not_called()
+
+    def test_upload_and_full_status_still_require_role_inventory(self):
+        for action in (("--status",), ("--image", "unused.bin")):
+            with self.subTest(action=action), \
+                    patch.object(ota, "SerialTransport") as serial, \
+                    patch.object(sys, "argv", ["flash_node.py", "--port", "COM5", *action]), \
+                    patch.object(sys, "stderr", io.StringIO()):
+                with self.assertRaises(SystemExit) as exc:
+                    ota.main()
+                self.assertEqual(exc.exception.code, 2)
+                serial.assert_not_called()
+
     def test_close_failure_preserves_original_diagnostic_and_failure_exit_code(self):
         transport = Mock()
         transport.send.side_effect = OSError("ClearCommError failed")

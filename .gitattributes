@@ -1,2 +1,4 @@
 i4a text eol=lf
 *.sh text eol=lf
+*.pdf binary
+*.pptx binary

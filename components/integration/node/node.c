@@ -21,7 +21,10 @@
 #define NAT_NETWORK_NAME "Internet4All_Root"
 #define NAT_NETWORK_PASSWORD "I4A123456"
 
-#define HOUSE_NETWORK_NAME "ComNetAR"
+#ifndef I4A_HOUSE_NETWORK_NAME
+#define I4A_HOUSE_NETWORK_NAME "ComNetAR - Grillo"
+#endif
+#define HOUSE_NETWORK_NAME I4A_HOUSE_NETWORK_NAME
 #define HOUSE_NETWORK_PASSWORD ""
 
 #define CALIBRATION_DELAY_SECONDS 2
@@ -80,8 +83,10 @@ static void node_ap_sta_cycle_task(void *arg) {
     //Task called after initializing AP in AP+STA mode, wait for the first check
     vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
   
-    // Stay in AP while the AP condition is true
-    while (node_ptr->node_device_ptr->access_point_ptr->server_is_up) {
+    // An associated peer also occupies the AP before its TCP session is ready.
+    // Never tear it down merely because the listener event is still pending.
+    while (!device_ap_can_search(node_ptr->node_device_ptr) ||
+           rs_maintenance(node_get_rs_instance()) || node_is_sta_locked()) {
       vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
     }
   
@@ -90,7 +95,9 @@ static void node_ap_sta_cycle_task(void *arg) {
     vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
   
     // Stay in STA while the STA condition is true
-    while (node_ptr->node_device_ptr->station_ptr->is_fully_connected) {
+    while (node_ptr->node_device_ptr->mode == STATION &&
+           node_ptr->node_device_ptr->station_ptr &&
+           node_ptr->node_device_ptr->station_ptr->is_fully_connected) {
       vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
     }
   
@@ -226,7 +233,8 @@ void node_set_as_ap(uint32_t network, uint32_t mask){
     // Start the loop task the first time, otherwise simply switch back to AP mode on subsequent calls
     if(!node_ptr->node_device_is_apsta) {
       node_ptr->node_device_is_apsta = true;
-      xTaskCreatePinnedToCore(node_ap_sta_cycle_task, "node_ap_sta_cycle", TASK_NODE_AP_STA_STACK, NULL, TASK_NODE_AP_STA_PRIORITY, NULL, TASK_NODE_AP_STA_CORE);
+      BaseType_t started = xTaskCreatePinnedToCore(node_ap_sta_cycle_task, "node_ap_sta_cycle", TASK_NODE_AP_STA_STACK, NULL, TASK_NODE_AP_STA_PRIORITY, NULL, TASK_NODE_AP_STA_CORE);
+      ESP_ERROR_CHECK(started == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
     }
     device_init(node_ptr->node_device_ptr, node_ptr->node_device_uuid, node_ptr->node_device_orientation, wifi_network_prefix, wifi_network_password, ap_channel_to_emit, ap_max_sta_connections, (uint8_t)node_ptr->node_device_is_center_root, (uint8_t)node_ptr->node_device_is_apsta, AP);
     device_set_network_ap(node_ptr->node_device_ptr, network_cidr, network_gateway, network_mask);

@@ -13,7 +13,8 @@ static esp_err_t ring_link_netif_handler(ring_link_payload_t *p)
     }
     else  // not for me, warn and discard
     {
-        ESP_LOGW(TAG, "Discarding packet. id '%i' ('%s').", p->id, p->buffer);
+        ESP_LOGW(TAG, "Discarding packet: id=%u src=%u dst=%u len=%u.",
+                 p->id, p->src_id, p->dst_id, p->len);
         return ESP_OK;        
     }
 }

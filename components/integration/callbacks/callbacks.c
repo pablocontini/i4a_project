@@ -8,6 +8,8 @@
 #include "callbacks.h"
 
 #define MAX_MESSAGE_SIZE 512
+/* ring_share prepends its component byte to a payload of up to 512 bytes. */
+#define MAX_SIBLING_MESSAGE_SIZE (MAX_MESSAGE_SIZE + 1)
 #define SIBLING_QUEUE_LENGTH 10
 #define PEER_QUEUE_LENGTH 10
 #define PEER_DELAY_SECONDS 2
@@ -21,7 +23,7 @@ static void do_nothing_message(void *ctx, const uint8_t *data, uint16_t len) {
 }
 
 typedef struct message {
-    uint8_t data[MAX_MESSAGE_SIZE];
+    uint8_t data[MAX_SIBLING_MESSAGE_SIZE];
     uint16_t length;
 } message_t;
 
@@ -149,6 +151,10 @@ void node_on_peer_message(void *msg, uint16_t len) {
 }
 
 void node_on_sibling_message(void *msg, uint16_t len) {
+    /* The physical ring admits larger frames than the callback queue. Keep
+     * the component byte of a maximum-size ring_share message, but reject
+     * anything larger before copying into the task's automatic buffer. */
+    if (!msg || !len || len > MAX_SIBLING_MESSAGE_SIZE) return;
     message_t m;
     memcpy(m.data, msg, len);
     m.length = len;

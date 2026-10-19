@@ -8,6 +8,8 @@
 
 #define UNUSED(x) ((void)x)
 
+static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event);
+
 static void on_peer_connected(routing_t *self, const network_t *connection) {
     UNUSED(connection);
 
@@ -15,7 +17,7 @@ static void on_peer_connected(routing_t *self, const network_t *connection) {
 
     state->local_state = LOCAL_STATE_CONNECTED;
     rt_peer_event_t peer_event = {
-        .event_id = PEER_HANDSHAKE, 
+        .event_id = PEER_HANDSHAKE,
         .payload.handshake = {
             .external_network = state->node_network,
             .provided_network = state->device_network,
@@ -30,9 +32,15 @@ static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
 
     if (state->global_state == GLOBAL_STATE_WITHOUT_NETWORK) {
+        if (event->dtr == 0 || event->dtr >= UINT16_MAX)
+            return;
+        network_t device_network = get_node_subnet(&event->provided_network, self->orientation);
+        if (device_network.mask == 0)
+            return;
         // Provision node
-        state->dtr = event->dtr;
-        state->device_network = get_node_subnet(&event->provided_network, self->orientation);
+        // Crossing a wireless link adds one node; SPI siblings share this DTR.
+        state->dtr = event->dtr + 1;
+        state->device_network = device_network;
         state->node_network = event->provided_network;
         state->global_state = GLOBAL_STATE_WITH_NETWORK;
         state->is_local_root = true;
@@ -48,14 +56,23 @@ static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
             .payload.provision = {
                 .network = state->node_network,
                 .provider_id = self->orientation,
-                .dtr = state->dtr + 1,
+                .dtr = state->dtr,
             },
         };
 
         rs_broadcast(self->deps.rs, RS_ROUTING, &provision, sizeof(provision));
     } else {
+        /* Both ends send their handshake on admission. The unprovisioned end
+         * advertises 0/0; that is not a route and must never replace our WAN
+         * gateway while we are providing its first network. */
+        if (event->external_network.addr == 0 || event->external_network.mask == 0)
+            return;
         // We already have a network, add a redundant route to the table
         add_global_route(self, &event->external_network, self->orientation);
+        /* A reconnect does not reprovision this node. It still needs to
+         * restore its gateway when the handshake advertises a usable path. */
+        rt_peer_update_dtr_t update = { .dtr = event->dtr };
+        on_update_dtr(self, &update);
     }
 }
 
@@ -65,7 +82,7 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
     uint32_t peer_dtr = event->dtr;
     uint32_t my_dtr = state->dtr;
 
-    if (peer_dtr == 0) {
+    if (peer_dtr == 0 || peer_dtr == UINT32_MAX) {
         // Peer is not connected to the network
         return;
     }
@@ -74,6 +91,8 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
         // I'm not connected to the network or I can improve my DTR
         state->dtr = peer_dtr + 1;
         state->is_local_root = true;
+        state->global_state = GLOBAL_STATE_WITH_NETWORK;
+        state->gateway_request_timeout = 0;
         add_global_route(self, &NETWORK(0, 0), self->orientation);
 
         rt_sibl_event_t event = {
@@ -87,8 +106,18 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
 static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_request_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
 
+    /* A repeated path must not install a route to this node through a peer. */
+    for (size_t i = 0; i < sizeof(event->hag_networks) / sizeof(event->hag_networks[0]); ++i) {
+        if (event->hag_networks[i].addr == 0)
+            break;
+        if (event->hag_networks[i].addr == state->node_network.addr &&
+            event->hag_networks[i].mask == state->node_network.mask)
+            return;
+    }
+
     for (uint32_t i = 0; i < sizeof(event->hag_networks) / sizeof(event->hag_networks[0]); i++) {
-        if (event->hag_networks[0].addr == 0)
+        // The zero-filled tail terminates the path; it is not a default route.
+        if (event->hag_networks[i].addr == 0)
             break;
 
         add_global_route(self, &event->hag_networks[i], self->orientation);
@@ -123,14 +152,20 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
 
     uint32_t peer_dtr = event->dtr;
 
-    if ((state->dtr != 0) && (state->dtr <= peer_dtr)) {
-        // This DTR is worse than mine
+    if (peer_dtr == 0 || peer_dtr == UINT32_MAX) {
+        return;
+    }
+    uint32_t candidate_dtr = peer_dtr + 1;
+
+    if ((state->dtr != 0) && (state->dtr <= candidate_dtr)) {
+        // Keep the current gateway when the candidate is equal or worse.
         return;
     }
 
     state->global_state = GLOBAL_STATE_WITH_NETWORK;
     state->is_local_root = true;
-    state->dtr = peer_dtr + 1;
+    state->dtr = candidate_dtr;
+    state->gateway_request_timeout = 0;
 
     add_global_route(self, &NETWORK(0, 0), self->orientation);
     rt_sibl_event_t sibl_event = {
@@ -149,11 +184,15 @@ static void on_peer_lost(routing_t *self, const network_t *connection) {
     state->local_state = LOCAL_STATE_NOT_CONNECTED;
     remove_routes_by_output(self, self->orientation);
 
-    if (state->is_local_root) {
+    /* A lost redundant link can remove the upstream node's return route even
+     * when this radio was no longer the default gateway. Reannounce the path
+     * through the surviving radios in that case as well. */
+    if (state->is_local_root || state->dtr > 1) {
         log_info(TAG, "[peer_lost] Connection to ROOT node has been lost");
         state->is_local_root = false;
         state->dtr = 0;
         state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
+        state->gateway_request_timeout = 0;
         rt_sibl_event_t sibl_event = {
             .event_id = SIBL_SEND_NEW_GATEWAY_REQUEST,
         };

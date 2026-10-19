@@ -34,65 +34,14 @@ static const esp_netif_config_t netif_config = {
 
 esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
 {
+    uint16_t iphdr_len;
+    if (!ring_link_netif_ip_length(p, &iphdr_len)) {
+        ESP_LOGW(TAG, "Discarding invalid IP payload.");
+        return ESP_OK;
+    }
+
     struct pbuf *q;
-    struct ip_hdr *ip_header;
     esp_err_t error;
-
-    if (p->len <= 0 || p->len < IP_HLEN) {
-        ESP_LOGW(TAG, "Discarding invalid payload.");
-        return ESP_OK;
-    }
-
-    ip_header = (struct ip_hdr *)p->buffer;
-
-    if (!((IPH_V(ip_header) == 4) || (IPH_V(ip_header) == 6))) {
-        ESP_LOGW(TAG, "Discarding non-IP payload.");
-        return ESP_OK;
-    }
-
-    // ip4_addr_t src_ip;
-    // src_ip.addr = ip_header->src.addr;
-
-    // // Convert IP address to host format (little-endian if needed)
-    // uint32_t addr_ = ntohl(src_ip.addr); // Convert address to host format
-
-    // // Extract octets
-    // uint8_t octet1_ = (addr_ >> 24) & 0xFF; // First octet
-    // uint8_t octet2_ = (addr_ >> 16) & 0xFF; // Second octet
-
-    // // Print IP address for debugging
-    // ESP_LOGD(TAG, "SRC IP: %d.%d.%d.%d",
-    //     octet1_, octet2_, (int)((addr_ >> 8) & 0xFF), (int)(addr_ & 0xFF));
-
-    // // Print destination IP address
-    // ip4_addr_t dest_ip;
-    // dest_ip.addr = ip_header->dest.addr;
-
-    // // Convert IP address to host format (little-endian if needed)
-    // uint32_t addr = ntohl(dest_ip.addr); // Convert address to host format
-
-    // // Extract octets
-    // uint8_t octet1 = (addr >> 24) & 0xFF; // First octet
-    // uint8_t octet2 = (addr >> 16) & 0xFF; // Second octet
-
-    // // Print IP address for debugging
-    // ESP_LOGD(TAG, "Destination IP: %d.%d.%d.%d",
-    //     octet1, octet2, (int)((addr >> 8) & 0xFF), (int)(addr & 0xFF));
-
-    // Filter by subnet 192.170.x.x
-    // if (octet1 != 192 || octet2 != 170) {
-    //     ESP_LOGW(TAG, "Discarding packet not in 192.170.x.x subnet.");
-    //     return ESP_OK;
-    // }
-
-    // Total IP packet size from header
-    u16_t iphdr_len = lwip_ntohs(IPH_LEN(ip_header));
-
-    // Validate that payload size is sufficient
-    if (iphdr_len > p->len) {
-        ESP_LOGW(TAG, "Payload size (%d) is smaller than IP length (%d). Discarding packet.", p->len, iphdr_len);
-        return ESP_OK;
-    }
 
     // Allocate pbuf with required size
     q = pbuf_alloc(PBUF_TRANSPORT, iphdr_len, PBUF_RAM);
@@ -109,11 +58,11 @@ esp_err_t ring_link_rx_netif_receive(ring_link_payload_t *p)
 
     //ip4_debug_print(q);
 
-    // Pass pbuf to esp_netif
+    // The input callback owns q, including when lwIP rejects the packet.
+    // esp_netif_receive may hide errors when receive reporting is disabled.
     error = esp_netif_receive(ring_link_rx_netif, q, q->tot_len, NULL);
     if (error != ESP_OK) {
         ESP_LOGW(TAG, "process_thread_receive failed.");
-        pbuf_free(q);
     }
 
     return error;
@@ -124,11 +73,12 @@ static err_t output_function(struct netif *netif, struct pbuf *p, const ip4_addr
     // ESP_LOGI(TAG, "Calling output_function(struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)");
     // printf("len %u\n", p->len);
     // printf("total len %u\n", p->tot_len);
+    if (!p || !p->payload || !p->len) return ERR_VAL;
     struct ip_hdr *iphdr = (struct ip_hdr *)p->payload;
     if((IPH_V(iphdr) == 4) || (IPH_V(iphdr) == 6)){
-        netif->linkoutput(netif, p);
+        return netif->linkoutput(netif, p);
     }
-    return ESP_OK;
+    return ERR_VAL;
 }
 
 static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
@@ -136,8 +86,6 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
     // ESP_LOGI(TAG, "Calling linkoutput_function(struct netif *netif, struct pbuf *p)");
 
     struct pbuf *q = p;
-    u16_t alloc_len = (u16_t)(p->tot_len);
-    ip4_debug_print(q);
     esp_netif_t *esp_netif = esp_netif_get_handle_from_netif_impl(netif);
     esp_err_t ret = ESP_FAIL;
 
@@ -152,7 +100,10 @@ static err_t linkoutput_function(struct netif *netif, struct pbuf *p)
         ESP_LOGE(TAG, "low_level_output: pbuf is a list, application may has bug");
         q = pbuf_alloc(PBUF_RAW_TX, p->tot_len, PBUF_RAM);
         if (q != NULL) {
-            pbuf_copy(q, p);
+            if (pbuf_copy(q, p) != ERR_OK) {
+                pbuf_free(q);
+                return ERR_VAL;
+            }
         } else {
             return ERR_MEM;
         }
@@ -184,35 +135,6 @@ err_t ring_link_rx_netstack_lwip_init_fn(struct netif *netif)
     return ERR_OK;
 }
 
-esp_netif_recv_ret_t ring_link_rx_netstack_lwip_input_fn(void *h, void *buffer, size_t len, void *l2_buff)
-{
-    struct netif *netif = h;
-    err_t result;  // Variable para almacenar el código de retorno
-
-    /* Verifica que el buffer y la interfaz sean válidos */
-    if (unlikely(!buffer || !netif_is_up(netif))) {
-        if (l2_buff) {
-            esp_netif_free_rx_buffer(netif->state, l2_buff);
-        }
-        return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_FAIL);
-    }
-
-    /* Usa directamente el buffer recibido */
-    struct pbuf *p = (struct pbuf *)buffer;
-
-    /* Llama a la función de entrada y captura el resultado */
-    result = netif->input(p, netif);
-
-    /* Imprime el código de error si hay problemas */
-    if (unlikely(result != ERR_OK)) {
-        ESP_LOGE("ring_link", "netif->input error: %d", result);
-        return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_FAIL);
-    }
-
-    /* Todo salió bien */
-    return ESP_NETIF_OPTIONAL_RETURN_CODE(ESP_OK);
-}
-
 static esp_err_t ring_link_rx_driver_transmit(void *h, void *buffer, size_t len)
 {
     ESP_LOGW(TAG, "This netif should not transmit but ring_link_rx_driver_transmit was called");
@@ -223,24 +145,8 @@ static esp_err_t esp_netif_ring_link_driver_transmit(void *h, void *buffer, size
 {
     // ESP_LOGI(TAG, "ring_link_netif_driver_transmit(void *h, void *buffer, size_t len) called");
 
-    if (buffer==NULL) {
-        ESP_LOGI(TAG, "buffer is null");
-        return ESP_OK;
-    }
-    ring_link_payload_t p = {
-        .id = s_id_counter_rx++,
-        .ttl = RING_LINK_PAYLOAD_TTL,
-        .src_id = config_get_id(),
-        .dst_id = CONFIG_ID_ANY,
-        .buffer_type = RING_LINK_PAYLOAD_TYPE_ESP_NETIF,
-        .len = len,
-    };
-    if (len > RING_LINK_NETIF_MTU) {
-        ESP_LOGE(TAG, "Buffer length exceeds maximum allowed size.");
-        return ESP_ERR_INVALID_SIZE;
-    }
-    memcpy(p.buffer, buffer, len);
-    return ring_link_lowlevel_transmit_payload(&p);
+    (void)h;
+    return ring_link_netif_transmit(buffer, len, s_id_counter_rx++);
 }
 
 static esp_err_t ring_link_rx_driver_post_attach(esp_netif_t * esp_netif, void * args)

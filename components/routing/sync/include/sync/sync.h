@@ -38,6 +38,7 @@ typedef struct sync_cs_callback {
     sync_cs_callback_fn_t callback;
     void *context;
     bool is_inside;
+    bool deferred;
 } sync_cs_callback_t;
 
 typedef struct sync {
@@ -46,6 +47,11 @@ typedef struct sync {
     bool is_leader;
     sync_cs_callback_t critical_sections[RS_LAST_COMPONENT_ID];
     sync_impl_t *impl;
+    mutex_t lock;
+    uint32_t session;
+    uint32_t sequence[RS_LAST_COMPONENT_ID];
+    uint32_t completed[RS_LAST_COMPONENT_ID];
+    uint8_t destination[RS_LAST_COMPONENT_ID];
     union {
         sync_leader_t leader;
     } _st;
@@ -76,6 +82,15 @@ void sync_register_critical_section(sync_t *self, component_id_t cs_id, sync_cs_
  * issue a new token to the SPI ring.
  */
 void sync_request_critical_section(sync_t *self, component_id_t cs_id);
+
+/* Retry the same circulation, preserving its identity and completed callbacks. */
+void sync_on_tick(sync_t *self, uint32_t dt_ms);
+/* Retain this token when publication fails; retry this callback on replay. */
+void sync_defer_critical_section(sync_t *self, component_id_t cs_id);
+bool sync_current_token(sync_t *self, component_id_t cs_id,
+                        uint32_t *session, uint32_t *sequence);
+bool sync_token_matches(sync_t *self, component_id_t cs_id,
+                        uint32_t session, uint32_t sequence, uint8_t owner);
 
 /**
  * Returns true if the current device is currently inside the critical
