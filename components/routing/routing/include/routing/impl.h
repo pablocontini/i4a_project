@@ -41,6 +41,9 @@ typedef struct rt_root_state {
      * expire.
      */
     uint32_t gateway_requested_timeout;
+
+    /* Keep startup provisioning pending after a lost ring delivery/ACK. */
+    uint32_t provision_retry_timeout;
 } rt_root_state_t;
 
 typedef struct rt_home_state {
@@ -48,6 +51,8 @@ typedef struct rt_home_state {
      * If true, this device was already provisioned.
      */
     bool is_provisioned;
+    /* Locally assigned client subnet survives replacement of shared tables. */
+    network_t device_network;
 } rt_home_state_t;
 
 typedef struct rt_forwarder_state {
@@ -98,6 +103,10 @@ typedef struct rt_forwarder_state {
     /* The path sent while waiting for a gateway is retried after packet loss. */
     network_t gateway_request_path[16];
     uint32_t gateway_request_timeout;
+
+    /* Nonzero while the initial sibling provision still lacks a ring ACK.
+     * Pause retries while this device is not a usable provider. */
+    uint32_t provision_retry_timeout;
 } rt_forwarder_state_t;
 
 typedef struct rt_peer_handshake {

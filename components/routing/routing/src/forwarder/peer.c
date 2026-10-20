@@ -10,6 +10,23 @@
 
 static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event);
 
+void rt_fwd_publish_provision(routing_t *self) {
+    rt_forwarder_state_t *state = GET_STATE(self);
+    rt_sibl_event_t provision = {
+        .event_id = SIBL_PROVISION,
+        .payload.provision = {
+            .network = state->node_network,
+            .provider_id = self->orientation,
+            .dtr = state->dtr,
+        },
+    };
+    /* Failed return ACKs may follow a partial delivery. Recipients already
+     * provisioned ignore the replay, while missing siblings can still join. */
+    state->provision_retry_timeout =
+        rs_broadcast(self->deps.rs, RS_ROUTING, &provision, sizeof(provision))
+            ? 0 : PROVISION_RETRY_MS;
+}
+
 static void on_peer_connected(routing_t *self, const network_t *connection) {
     UNUSED(connection);
 
@@ -51,16 +68,7 @@ static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
         // Update routing table
         add_global_route(self, &NETWORK(0, 0), self->orientation);
 
-        rt_sibl_event_t provision = {
-            .event_id = SIBL_PROVISION,
-            .payload.provision = {
-                .network = state->node_network,
-                .provider_id = self->orientation,
-                .dtr = state->dtr,
-            },
-        };
-
-        rs_broadcast(self->deps.rs, RS_ROUTING, &provision, sizeof(provision));
+        rt_fwd_publish_provision(self);
     } else {
         /* Both ends send their handshake on admission. The unprovisioned end
          * advertises 0/0; that is not a route and must never replace our WAN

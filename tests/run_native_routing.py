@@ -39,6 +39,12 @@ def main():
     failures = []
     for name in (
         "test_initial_uplink_counts_the_node_once",
+        "test_home_restores_missing_client_route_without_restarting_ap",
+        "test_home_does_not_invent_client_route_before_provision",
+        "test_initial_provision_retries_loss_without_renumbering_or_duplicate_ap",
+        "test_pending_provision_waits_for_uplink_and_resumes_after_reconnect",
+        "test_root_provision_loss_retries_without_panic_or_gateway_change",
+        "test_root_gateway_response_retries_loss_without_deadline_starvation",
         "test_gateway_request_keeps_the_root_default_route",
         "test_unprovisioned_peer_handshake_preserves_provider_gateway",
         "test_reconnected_provisioned_node_restores_gateway_without_renumbering",

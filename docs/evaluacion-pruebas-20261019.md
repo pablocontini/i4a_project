@@ -1,5 +1,11 @@
 # Evaluación de las pruebas y cambios propuestos, 19/10/2026
 
+La revisión posterior adopta pérdida SPI como condición de operación y corrige
+provisión y respuesta de recuperación que no toleraban un anuncio perdido:
+[tolerancia-perdidas-spi-20261019.md](tolerancia-perdidas-spi-20261019.md).
+Las imágenes y validaciones siguientes corresponden a la revisión de integridad
+anterior; no incluyen esos reintentos nuevos.
+
 Las capturas confirman pérdidas intermitentes incluso con Ramona apagada.
 En las placas monitoreadas no se reprodujo la caída permanente de Internet
 ni un reinicio durante estas tres pruebas. Corresponde corregir los accesos
@@ -80,6 +86,16 @@ agregados distintos. Las tablas agregaron rutas específicas a Ramona sin
 reemplazar la salida hacia RPi o Internet.
 
 ## Qué permiten concluir los CRC
+
+Orden físico del anillo, informado por el usuario el 11/10/2026 y confirmado
+para el tramo de entrada al central el 12/10/2026:
+
+`Central → Sur → Oeste → Norte → Este → Central`.
+
+La entrada SPI del central recibe de **Este**; su salida va a **Sur**. En
+Grillo ambos extremos de la recepción que se investiga ya están disponibles
+por USB: Este en COM17 y central en COM7. No es necesario volver a pedir
+identificación del cableado para este tramo.
 
 En la referencia DMA aumentaron tres CRC en central de Root, tres en Sur
 de Root y seis en central de Grillo. Durante la ventana de la segunda captura

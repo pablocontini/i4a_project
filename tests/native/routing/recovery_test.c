@@ -18,6 +18,8 @@ static unsigned mutex_errors, token_requests, routed_callbacks, observed_tick_ms
 static unsigned deferred_count;
 static unsigned network_change_count, ap_enable_count;
 static bool publish_success;
+static unsigned provision_failures_remaining;
+static unsigned gateway_response_failures_remaining, panic_count;
 static mutex_t *created_mutexes[32];
 static unsigned created_mutex_count;
 static wireless_callbacks_t wireless_callbacks;
@@ -44,7 +46,7 @@ void mutex_destroy(mutex_t *lock) { if (valid_mutex(lock)) *lock = NULL; }
 void os_log(os_log_level_t level, const char *tag, const char *fmt, ...) {
     (void)level; (void)tag; (void)fmt;
 }
-void os_panic(const char *fmt, ...) { (void)fmt; }
+void os_panic(const char *fmt, ...) { (void)fmt; ++panic_count; }
 void node_set_network_settings(uint32_t network, uint32_t mask) {
     (void)network; (void)mask; ++network_change_count;
 }
@@ -81,6 +83,14 @@ bool rs_broadcast(ring_share_t *rs, component_id_t component, const void *data, 
     if (component != RS_ROUTING || len != sizeof(sibling_event)) return false;
     memcpy(&sibling_event, data, len);
     ++sibling_count;
+    if (sibling_event.event_id == SIBL_PROVISION && provision_failures_remaining) {
+        --provision_failures_remaining;
+        return false;
+    }
+    if (sibling_event.event_id == SIBL_NEW_GATEWAY_WINNER && gateway_response_failures_remaining) {
+        --gateway_response_failures_remaining;
+        return false;
+    }
     return true;
 }
 bool wl_send_peer_message(wireless_t *wl, const void *data, uint16_t len) {
@@ -100,6 +110,8 @@ static void reset_capture(void) {
     network_change_count = ap_enable_count = 0;
     created_mutex_count = 0;
     publish_success = true;
+    provision_failures_remaining = 0;
+    gateway_response_failures_remaining = panic_count = 0;
     memset(&routing_callback, 0, sizeof(routing_callback));
 }
 
@@ -135,6 +147,161 @@ EXPORT int test_initial_uplink_counts_the_node_once(void) {
     CHECK(sibling_count == 1 && sibling_event.event_id == SIBL_PROVISION);
     CHECK(sibling_event.payload.provision.dtr == 2);
     CHECK(sibling_event.payload.provision.network.addr == 0x0A400000);
+    return 0;
+}
+
+EXPORT int test_home_restores_missing_client_route_without_restarting_ap(void) {
+    reset_capture();
+    routing_t home;
+    CHECK(forwarder(&home, ORIENTATION_CENTER, 0));
+    CHECK(create_home_core(&home));
+    rt_sibl_provision_t provision = {
+        .network = NETWORK(0x0A400000, 0xFFE00000),
+        .provider_id = ORIENTATION_SOUTH, .dtr = 2,
+    };
+    home.role.impl.on_sibl_provision(&home, &provision);
+    CHECK(ap_enable_count == 1);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x0A540003) == ORIENTATION_CENTER);
+    /* Replay the observed Ramona table: WAN and lateral route, no client /14. */
+    routing_table_init(&home.node_state.routing_table, ORIENTATION_SOUTH);
+    routing_table_add(&home.node_state.routing_table, 0x0A600000, 0xFFE00000, ORIENTATION_EAST);
+    routing_table_add(&home.node_state.routing_table, 0x0A000000, 0xFF000000, ORIENTATION_SOUTH);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x0A540003) == ORIENTATION_SOUTH);
+    CHECK(home.role.impl.on_tick != NULL);
+    home.pending_publish = false;
+    home.role.impl.on_tick(&home, 1000);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x0A540003) == ORIENTATION_CENTER);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x01010101) == ORIENTATION_SOUTH);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x0A740003) == ORIENTATION_EAST);
+    CHECK(home.pending_publish && ap_enable_count == 1 && panic_count == 0);
+    home.pending_publish = false;
+    home.role.impl.on_tick(&home, 1000);
+    CHECK(!home.pending_publish && home.node_state.routing_table.count == 3);
+    CHECK(ap_enable_count == 1 && mutex_errors == 0);
+    routing_table_add(&home.node_state.routing_table, 0x0A540000, 0xFFFC0000, ORIENTATION_SOUTH);
+    home.role.impl.on_tick(&home, 1000);
+    CHECK(routing_table_route(&home.node_state.routing_table, 0x0A540003) == ORIENTATION_CENTER);
+    CHECK(home.node_state.routing_table.count == 3 && home.pending_publish);
+    CHECK(ap_enable_count == 1 && panic_count == 0);
+    return 0;
+}
+
+EXPORT int test_home_does_not_invent_client_route_before_provision(void) {
+    reset_capture();
+    routing_t home;
+    CHECK(forwarder(&home, ORIENTATION_CENTER, 0));
+    CHECK(create_home_core(&home));
+    CHECK(home.role.impl.on_tick != NULL);
+    home.role.impl.on_tick(&home, 1000);
+    CHECK(home.node_state.routing_table.count == 0 && !home.pending_publish);
+    CHECK(ap_enable_count == 0 && panic_count == 0);
+    return 0;
+}
+
+EXPORT int test_initial_provision_retries_loss_without_renumbering_or_duplicate_ap(void) {
+    reset_capture();
+    routing_t provider, follower;
+    CHECK(forwarder(&provider, ORIENTATION_EAST, 0));
+    CHECK(forwarder(&follower, ORIENTATION_NORTH, 0));
+    provider.role.impl.on_peer_connected(&provider, NULL);
+    rt_peer_handshake_t hello = {
+        .external_network = NETWORK(0x0A000000, 0xFF000000),
+        .provided_network = NETWORK(0x0A400000, 0xFFE00000), .dtr = 1,
+    };
+    provision_failures_remaining = 3;
+    provider.role.impl.on_peer_handshake(&provider, &hello);
+    CHECK(sibling_count == 1 && sibling_event.event_id == SIBL_PROVISION);
+    /* A failed full-ring ACK can still mean an earlier sibling received it. */
+    follower.role.impl.on_sibl_provision(&follower, &sibling_event.payload.provision);
+    CHECK(ap_enable_count == 1);
+    provider.role.impl.on_tick(&provider, 4999);
+    CHECK(sibling_count == 1);
+    provider.role.impl.on_tick(&provider, 1);
+    CHECK(sibling_count == 2 && sibling_event.event_id == SIBL_PROVISION);
+    provider.role.impl.on_tick(&provider, 5000);
+    CHECK(sibling_count == 3);
+    provider.role.impl.on_tick(&provider, 120000);
+    CHECK(sibling_count == 4 && provision_failures_remaining == 0);
+    follower.role.impl.on_sibl_provision(&follower, &sibling_event.payload.provision);
+    CHECK(ap_enable_count == 1 && network_change_count == 1);
+    CHECK(provider.role.state.forwarder.node_network.addr == hello.provided_network.addr);
+    CHECK(follower.role.state.forwarder.node_network.addr == hello.provided_network.addr);
+    CHECK(provider.node_state.routing_table.default_gateway == ORIENTATION_EAST);
+    provider.role.impl.on_tick(&provider, 120000);
+    CHECK(sibling_count == 4); /* No more retries once acknowledged. */
+    return 0;
+}
+
+EXPORT int test_pending_provision_waits_for_uplink_and_resumes_after_reconnect(void) {
+    reset_capture();
+    routing_t provider;
+    CHECK(forwarder(&provider, ORIENTATION_EAST, 0));
+    provider.role.impl.on_peer_connected(&provider, NULL);
+    rt_peer_handshake_t hello = {
+        .external_network = NETWORK(0x0A000000, 0xFF000000),
+        .provided_network = NETWORK(0x0A400000, 0xFFE00000), .dtr = 1,
+    };
+    provision_failures_remaining = 1;
+    provider.role.impl.on_peer_handshake(&provider, &hello);
+    provider.role.impl.on_peer_lost(&provider, NULL);
+    unsigned before = sibling_count;
+    provider.role.impl.on_tick(&provider, 120000);
+    CHECK(sibling_count == before); /* Do not advertise a disconnected provider. */
+    provider.role.impl.on_peer_connected(&provider, NULL);
+    provider.role.impl.on_peer_handshake(&provider, &hello);
+    before = sibling_count;
+    provider.role.impl.on_tick(&provider, 5000);
+    CHECK(sibling_count == before + 1 && sibling_event.event_id == SIBL_PROVISION);
+    CHECK(sibling_event.payload.provision.network.addr == hello.provided_network.addr);
+    CHECK(sibling_event.payload.provision.dtr == 2 && network_change_count == 1);
+    provider.role.impl.on_tick(&provider, 5000);
+    CHECK(sibling_count == before + 1);
+    return 0;
+}
+
+EXPORT int test_root_provision_loss_retries_without_panic_or_gateway_change(void) {
+    reset_capture();
+    routing_t root;
+    CHECK(forwarder(&root, ORIENTATION_CENTER, 0));
+    CHECK(create_root_core(&root, 0x0A000000, 0xFF000000));
+    provision_failures_remaining = 2;
+    root.role.impl.on_start(&root);
+    CHECK(panic_count == 0 && sibling_count == 1);
+    CHECK(root.node_state.routing_table.default_gateway == ORIENTATION_CENTER);
+    root.role.impl.on_tick(&root, 4999);
+    CHECK(sibling_count == 1);
+    root.role.impl.on_tick(&root, 1);
+    CHECK(sibling_count == 2 && panic_count == 0);
+    root.role.impl.on_tick(&root, 5000);
+    CHECK(sibling_count == 3 && sibling_event.event_id == SIBL_PROVISION);
+    CHECK(sibling_event.payload.provision.network.addr == 0x0A000000);
+    CHECK(sibling_event.payload.provision.dtr == 1);
+    root.role.impl.on_tick(&root, 120000);
+    CHECK(sibling_count == 3 && panic_count == 0);
+    CHECK(root.node_state.routing_table.default_gateway == ORIENTATION_CENTER);
+    return 0;
+}
+
+EXPORT int test_root_gateway_response_retries_loss_without_deadline_starvation(void) {
+    reset_capture();
+    routing_t root;
+    CHECK(forwarder(&root, ORIENTATION_CENTER, 0));
+    CHECK(create_root_core(&root, 0x0A000000, 0xFF000000));
+    root.role.impl.on_start(&root);
+    gateway_response_failures_remaining = 1;
+    rt_sibl_send_new_gateway_request_t request = {0};
+    root.role.impl.on_sibl_send_new_gateway_request(&root, &request);
+    root.role.impl.on_tick(&root, 10000);
+    CHECK(sibling_count == 2 && sibling_event.event_id == SIBL_NEW_GATEWAY_WINNER);
+    root.role.impl.on_sibl_send_new_gateway_request(&root, &request);
+    root.role.impl.on_tick(&root, 4999);
+    CHECK(sibling_count == 2);
+    root.role.impl.on_tick(&root, 1);
+    CHECK(sibling_count == 3 && sibling_event.event_id == SIBL_NEW_GATEWAY_WINNER);
+    CHECK(sibling_event.payload.new_gateway_winner.dtr == 1);
+    CHECK(root.node_state.routing_table.default_gateway == ORIENTATION_CENTER);
+    root.role.impl.on_tick(&root, 120000);
+    CHECK(sibling_count == 3 && panic_count == 0);
     return 0;
 }
 

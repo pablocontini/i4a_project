@@ -7,6 +7,17 @@
 
 static void on_tick(routing_t *self, uint32_t dt_ms) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (state->provision_retry_timeout && state->is_local_root &&
+        state->global_state == GLOBAL_STATE_WITH_NETWORK &&
+        state->local_state == LOCAL_STATE_CONNECTED) {
+        if (dt_ms < state->provision_retry_timeout) {
+            state->provision_retry_timeout -= dt_ms;
+        } else {
+            /* At most one attempt per tick, even after a long scheduling gap.
+             * Use the current network/DTR, never a stale queued provision. */
+            rt_fwd_publish_provision(self);
+        }
+    }
     if (state->global_state != GLOBAL_STATE_ON_GW_REQUEST ||
         state->local_state != LOCAL_STATE_CONNECTED ||
         state->gateway_request_timeout == 0)
@@ -34,6 +45,7 @@ bool create_forwarder_core(routing_t *self) {
     state->is_local_root = false;
     state->dtr = 0;
     state->gateway_request_timeout = 0;
+    state->provision_retry_timeout = 0;
 
     rt_fwd_sibl_set_required_callbacks(&self->role.impl);
     rt_fwd_peer_set_required_callbacks(&self->role.impl);
