@@ -127,6 +127,15 @@ el hash `d34b614f...` en los cinco roles, `running=0x20000`, `ready=1`,
 `boot_paused=0`, `pending_verify=0` y `recovery_pending=0`. El registro local es
 `app/build/ota-grillo-http4096-20261022-093959.log`.
 
+También se compiló e instaló por OTA el paquete
+`app/build/link-capture/ramona-config-http4096-20261022`, de 899632 bytes,
+en las cinco placas de Ramona mediante su central en COM5. La identidad ELF es
+`a9e46318dffe7323fec278bfe58a2b7874eb66274280b5b64eb3716be56f810d`.
+La consulta independiente posterior confirmó ese hash en los cinco roles y
+los mismos estados: `running=0x20000`, `ready=1`, `boot_paused=0`,
+`pending_verify=0` y `recovery_pending=0`. El registro local es
+`app/build/ota-ramona-http4096-20261022-095350.log`.
+
 Después de instalar la imagen corregida, repetir con el navegador que presentó
 el error: abrir la pantalla principal y administración, iniciar sesión y guardar
 un ajuste. Comprobar que no aparece HTTP 431 y que el valor persiste al volver a
