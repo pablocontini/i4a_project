@@ -84,3 +84,51 @@ persistencia de los cuatro ajustes de radio y el retorno desde orientación.
 Registrar los reinicios solicitados por BOOT para distinguirlos de fallas.
 
 La rama `fix/comnetar-stability-tools` se conserva como referencia de estabilidad.
+
+## Corrección posterior: HTTP 431 al navegar o guardar
+
+La primera imagen se instaló por OTA en las cinco placas de Grillo. Las cinco
+confirmaron el hash `9fc0b426...`, `ready=1`, `boot_paused=0` y ninguna
+verificación o recuperación pendiente. Al usar el portal, el usuario informó
+`Header fields are too long` en varias pantallas y al guardar.
+
+Esa imagen conservaba `CONFIG_HTTPD_MAX_REQ_HDR_LEN=512`. En ESP-IDF 5.4.1 ese
+límite corresponde a la sección completa de cabeceras de la petición. Su
+analizador emite HTTP 431 con ese texto antes de invocar el manejador del
+formulario. Las cabeceras de navegación y POST del navegador pueden superar
+512 bytes; aumentar el tamaño del formulario o del HTML no corrige ese rechazo.
+
+Se eleva el límite a 4096 bytes en los valores por defecto y se migra también
+el `sdkconfig` usado por `build_link_capture.py`. Esto último es necesario porque
+un `sdkconfig` existente prevalece sobre los valores por defecto. Se conservan
+límites personalizados mayores. La compilación del portal verifica ese mínimo
+para impedir que se genere accidentalmente otra imagen con el límite antiguo.
+El aumento añade 3584 bytes al buffer del servidor HTTP, asignado en heap cuando
+se inicia el portal. Se mantienen los límites del cuerpo del formulario, las
+comprobaciones CSRF y la autenticación.
+
+Para compilaciones directas con un `app/sdkconfig` anterior, abrir `idf.py
+menuconfig` y establecer **Component config > HTTP Server > Max HTTP Request
+Header Length** en 4096 o más antes de compilar. El generador de paquetes de
+diagnóstico lo hace automáticamente. La regresión verifica la migración de
+configuraciones antiguas, la conservación de límites mayores y la reconstrucción
+sin entradas duplicadas; las 56 pruebas Python pasan.
+
+El paquete corregido de Grillo es
+`app/build/link-capture/grillo-config-http4096-20261022`, de 899632 bytes, con
+identidad ELF `d34b614fd0ceb16cac1900ebac4b67d54d43028c3920a62689da1a5888b4cf9e`.
+El `sdkconfig` exportado confirma el límite de 4096 bytes y los manifiestos
+verifican los segmentos y las fuentes de la compilación. Usar este paquete en
+lugar de `grillo-config-20261022` para probar el portal corregido.
+
+La instalación OTA del paquete corregido finalizó correctamente en las cinco
+placas de Grillo mediante COM5. Una consulta posterior independiente confirmó
+el hash `d34b614f...` en los cinco roles, `running=0x20000`, `ready=1`,
+`boot_paused=0`, `pending_verify=0` y `recovery_pending=0`. El registro local es
+`app/build/ota-grillo-http4096-20261022-093959.log`.
+
+Después de instalar la imagen corregida, repetir con el navegador que presentó
+el error: abrir la pantalla principal y administración, iniciar sesión y guardar
+un ajuste. Comprobar que no aparece HTTP 431 y que el valor persiste al volver a
+entrar. La validación del formulario y su persistencia en el navegador siguen
+requiriendo esa comprobación en placas.

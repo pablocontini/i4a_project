@@ -72,6 +72,16 @@ def environment():
 def capture_config(text):
     lines = [line for line in text.splitlines() if not re.match(
         r"(?:# )?CONFIG_I4A_CAPTURE_DIAGNOSTICS(?:=| is not set)", line)]
+    # sdkconfig values override defaults, so migrate previously built images too.
+    header_limit = 4096
+    remaining = []
+    for line in lines:
+        match = re.fullmatch(r"CONFIG_HTTPD_MAX_REQ_HDR_LEN=(\d+)", line)
+        if match:
+            header_limit = max(header_limit, int(match[1]))
+        elif line != "# CONFIG_HTTPD_MAX_REQ_HDR_LEN is not set":
+            remaining.append(line)
+    lines = remaining + [f"CONFIG_HTTPD_MAX_REQ_HDR_LEN={header_limit}"]
     return "\n".join(lines) + "\nCONFIG_I4A_CAPTURE_DIAGNOSTICS=y\n"
 
 

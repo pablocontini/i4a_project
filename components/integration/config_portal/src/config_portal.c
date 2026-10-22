@@ -15,6 +15,7 @@
 #include "esp_timer.h"
 #include "esp_wifi.h"
 #include "esp_wifi_default.h"
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lwip/ip4_addr.h"
@@ -59,6 +60,9 @@
 #define PORTAL_PAGE_HTML_LENGTH 12000
 
 #define SESSION_COOKIE_NAME "i4a_session"
+
+_Static_assert(CONFIG_HTTPD_MAX_REQ_HDR_LEN >= 4096,
+               "Configuration portal requires CONFIG_HTTPD_MAX_REQ_HDR_LEN >= 4096; update sdkconfig or menuconfig");
 
 static const char *TAG = "config_portal";
 

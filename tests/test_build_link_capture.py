@@ -25,6 +25,20 @@ class DiagnosticBuildTests(unittest.TestCase):
         once = build.capture_config("CONFIG_I4A_CAPTURE_DIAGNOSTICS=n\nCONFIG_OTHER=y\n")
         self.assertEqual(build.capture_config(once), once)
 
+    def test_existing_sdkconfig_migrates_small_http_header_limit(self):
+        for setting in ("", "CONFIG_HTTPD_MAX_REQ_HDR_LEN=512\n",
+                        "# CONFIG_HTTPD_MAX_REQ_HDR_LEN is not set\n"):
+            with self.subTest(setting=setting):
+                updated = build.capture_config(setting + "CONFIG_HTTPD_MAX_URI_LEN=512\n")
+                self.assertEqual(updated.count("CONFIG_HTTPD_MAX_REQ_HDR_LEN"), 1)
+                self.assertIn("CONFIG_HTTPD_MAX_REQ_HDR_LEN=4096\n", updated)
+                self.assertIn("CONFIG_HTTPD_MAX_URI_LEN=512\n", updated)
+
+    def test_existing_larger_http_header_limit_is_preserved(self):
+        updated = build.capture_config("CONFIG_HTTPD_MAX_REQ_HDR_LEN=8192\n")
+        self.assertIn("CONFIG_HTTPD_MAX_REQ_HDR_LEN=8192\n", updated)
+        self.assertNotIn("CONFIG_HTTPD_MAX_REQ_HDR_LEN=4096\n", updated)
+
 
 if __name__ == "__main__":
     unittest.main()
