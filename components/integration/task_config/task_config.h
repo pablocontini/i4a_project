@@ -47,6 +47,11 @@
 #define TASK_REMOTE_CONTROL_PRIORITY  LOW_PRIORITY
 
 // Callbacks tasks
+// Configuration portal tasks
+#define TASK_CONFIG_PORTAL_CORE          1
+#define TASK_CONFIG_PORTAL_STACK         4096
+#define TASK_CONFIG_PORTAL_APPLY_STACK   4096
+#define TASK_CONFIG_PORTAL_PRIORITY      LOW_PRIORITY
 
 #define TASK_CALLBACK_CORE          0
 #define TASK_CALLBACK_STACK         4096

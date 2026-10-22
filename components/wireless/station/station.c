@@ -74,6 +74,7 @@ void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t ori
   stationPtr->initialized = true;
   stationPtr->event_handlers_registered = false;
   stationPtr->stopping = false;
+  stationPtr->rssi_threshold_dbm = RSSI_THRESHOLD;
 
   esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
   assert(sta_netif);
@@ -95,11 +96,11 @@ void station_find_ap(StationPtr stationPtr) {
   wifi_ap_record_t ap;
   wifi_ap_record_t best_ap;
   bool found = false;
-  int best_rssi = RSSI_THRESHOLD;
+  int best_rssi = stationPtr->rssi_threshold_dbm;
 
   while (esp_wifi_scan_get_ap_record(&ap) == ESP_OK) {
 
-    if (ap.rssi < RSSI_THRESHOLD) {
+    if (ap.rssi < stationPtr->rssi_threshold_dbm) {
       continue;
     }
 
@@ -319,7 +320,7 @@ int8_t station_scan_best_rssi(StationPtr stationPtr) {
 
   while (esp_wifi_scan_get_ap_record(&ap) == ESP_OK) {
 
-    if (ap.rssi < RSSI_THRESHOLD) {
+    if (ap.rssi < stationPtr->rssi_threshold_dbm) {
       continue;
     }
 
@@ -334,4 +335,9 @@ int8_t station_scan_best_rssi(StationPtr stationPtr) {
   }
 
   return best_rssi;
+}
+
+void station_set_rssi_threshold(StationPtr stationPtr, int8_t threshold_dbm) {
+  if (stationPtr && threshold_dbm <= -1)
+    stationPtr->rssi_threshold_dbm = threshold_dbm;
 }

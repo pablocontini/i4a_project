@@ -146,6 +146,7 @@ static int setup(node_ota_packet_t *request) {
     serial_started = locked = inject_stale = false;
     boot_recovery_pending = false;
     test_boot_quiet = false;
+    test_maintenance = false;
     peer_ready_mask = NODE_OTA_ROLES;
     bad_hash_peer = -1;
     queued_count = emitted_count = broadcasts = ordering_error = 0;
@@ -202,6 +203,29 @@ EXPORT int test_begin_waits_for_application_ready(void) {
     create_result = pdPASS;
     CHECK(start_error == ESP_ERR_NO_MEM && !application_ready && !serial_started);
     CHECK(node_ota_start_serial() == ESP_OK && application_ready && serial_started);
+    return 0;
+}
+
+EXPORT int test_begin_special_mode_is_read_only_and_mode_switch_waits_for_ota(void) {
+    node_ota_packet_t request, reply;
+    CHECK(setup(&request) == ESP_OK);
+    CHECK(node_ota_can_switch_mode());
+    test_boot_quiet = true;
+    CHECK(!node_ota_can_switch_mode());
+    test_boot_quiet = false;
+    set_maintenance(true, request.session);
+    CHECK(!node_ota_can_switch_mode());
+    set_maintenance(false, 0);
+    node_ota_set_updates_allowed(false);
+    CHECK(node_ota_can_switch_mode());
+    CHECK(node_ota_exchange(&request, capture, NULL) == ESP_ERR_INVALID_STATE);
+    CHECK(broadcasts == 0 && emitted_count == 1 && receiver.phase == NODE_OTA_IDLE);
+    CHECK(node_ota_get_u32(emitted[0].data) == ESP_ERR_INVALID_STATE);
+    request.op = NODE_OTA_INFO;
+    request.length = 0;
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && reply.length == 53 && reply.data[51]);
+    node_ota_set_updates_allowed(true);
     return 0;
 }
 

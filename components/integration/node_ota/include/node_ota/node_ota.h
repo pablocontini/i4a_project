@@ -10,6 +10,10 @@ esp_err_t node_ota_init(ring_share_t *ring, uint8_t role);
  * Marks application ready; BEGIN remains blocked until the center checks all
  * five confirmed boards and releases the startup gate. Only the center opens UART0. */
 esp_err_t node_ota_start_serial(void);
+/* Special boot modes expose INFO but must reject new uploads. Set at startup. */
+void node_ota_set_updates_allowed(bool allowed);
+/* BOOT/portal restarts must wait until startup and OTA maintenance finish. */
+bool node_ota_can_switch_mode(void);
 
 typedef void (*node_ota_reply_fn)(const node_ota_packet_t *reply, void *context);
 /* Transport-neutral coordinator entry point. Serializes callers, waits for all

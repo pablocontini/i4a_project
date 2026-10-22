@@ -12,6 +12,11 @@
 #include "remote_control.h"
 #include "task_config.h"
 #include "node.h"
+#include "config_portal/config_portal.h"
+#include "portal_settings/portal_settings.h"
+#include "wifi_credentials/wifi_credentials.h"
+
+bool antenna_orientation_mode_pin_is_active(void);
 
 #define MAX_DEVICES_PER_HOUSE 5
 
@@ -63,6 +68,13 @@ static Device node_device = {
 };
 
 static node_t *node_ptr = &node;
+static bool orientation_mode_requested;
+static bool configuration_mode_requested;
+
+void node_set_orientation_mode_requested(bool enabled) { orientation_mode_requested = enabled; }
+bool node_is_orientation_mode_enabled(void) { return orientation_mode_requested; }
+void node_set_configuration_mode_requested(bool enabled) { configuration_mode_requested = enabled; }
+bool node_is_configuration_mode_enabled(void) { return configuration_mode_requested; }
 
 static node_device_orientation_t node_get_config_orientation(void){
   config_id_t config_bits = config_get_id();
@@ -122,16 +134,29 @@ void node_setup(void){
   vTaskDelay(pdMS_TO_TICKS(node_ptr->node_device_orientation * CALIBRATION_DELAY_SECONDS * 1000));
 
   ESP_ERROR_CHECK(device_wifi_init());
+  ESP_ERROR_CHECK(wifi_credentials_init());
   ESP_ERROR_CHECK(ring_link_init());
 
   if(node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER) {
+    ESP_ERROR_CHECK(portal_settings_init());
+    bool is_root = config_mode_is(CONFIG_MODE_ROOT);
+    config_portal_boot_mode_t requested = config_portal_take_boot_mode_request();
+    bool orientation_mode = antenna_orientation_mode_pin_is_active() ||
+        requested == CONFIG_PORTAL_BOOT_MODE_ORIENTATION;
+    bool configuration_mode = !is_root && !orientation_mode &&
+        requested == CONFIG_PORTAL_BOOT_MODE_CONFIGURATION;
+    node_set_orientation_mode_requested(orientation_mode);
+    node_set_configuration_mode_requested(configuration_mode);
+    portal_antenna_power_config_t powers = portal_settings_get_antenna_powers();
+    portal_antenna_rssi_config_t thresholds = portal_settings_get_antenna_rssi_thresholds();
     while (!rm_broadcast_reset()) {
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     vTaskDelay(pdMS_TO_TICKS(10000)); // Wait 10 seconds so all the devices come back up in case this was an actual node reset
 
-    while (!rm_broadcast_startup_info(config_mode_is(CONFIG_MODE_ROOT))) {
+    while (!rm_broadcast_startup_info(is_root, orientation_mode, configuration_mode,
+                                    powers.quarter_dbm, thresholds.dbm)) {
       vTaskDelay(pdMS_TO_TICKS(100));
     }
 
@@ -150,8 +175,13 @@ void node_setup(void){
   node_ptr->node_device_uuid = rm_get_uuid();
   node_ptr->node_device_is_center_root = rm_is_root();
   node_ptr->node_device_is_apsta = false;
-  node_traffic_init();
-  im_scheduler_start();
+  if (!orientation_mode_requested && !configuration_mode_requested) {
+    node_traffic_init();
+    im_scheduler_start();
+    if (node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER &&
+        !node_ptr->node_device_is_center_root)
+      ESP_ERROR_CHECK(config_portal_start_button_monitor());
+  }
 }
 
 void node_set_as_sta(){
@@ -163,11 +193,12 @@ void node_set_as_sta(){
   char *wifi_network_password = NODE_LINK_PASSWORD;
 
   device_init(node_ptr->node_device_ptr, node_ptr->node_device_uuid, node_ptr->node_device_orientation, wifi_network_prefix, wifi_network_password, 6, 4, (uint8_t)node_ptr->node_device_is_center_root, (uint8_t)node_ptr->node_device_is_apsta, STATION);
+  device_set_rssi_threshold(node_ptr->node_device_ptr, rm_get_local_rssi_threshold());
 
   // Wait in sequence to avoid current peaks while STA starts up
   vTaskDelay(pdMS_TO_TICKS(node_ptr->node_device_orientation * AP_STA_DELAY_SECONDS * 1000));
   device_start_station(node_ptr->node_device_ptr);
-  device_set_max_tx_power(node_ptr->node_device_ptr, 80);
+  device_set_max_tx_power(node_ptr->node_device_ptr, rm_get_local_antenna_power());
   device_connect_station(node_ptr->node_device_ptr);
 }
 
@@ -196,7 +227,7 @@ void node_set_as_ap(uint32_t network, uint32_t mask){
     } else {
       node_gateway = network + 1;
       wifi_network_prefix = HOUSE_NETWORK_NAME;
-      wifi_network_password = HOUSE_NETWORK_PASSWORD;
+      wifi_network_password = (char *)wifi_credentials_get_house_password();
       ap_max_sta_connections = MAX_DEVICES_PER_HOUSE;
     }
   } else {
@@ -226,9 +257,10 @@ void node_set_as_ap(uint32_t network, uint32_t mask){
   // Root always AP only, non-root launches AP+STA mode
   if (node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER || node_ptr->node_device_is_center_root){
     device_init(node_ptr->node_device_ptr, node_ptr->node_device_uuid, node_ptr->node_device_orientation, wifi_network_prefix, wifi_network_password, ap_channel_to_emit, ap_max_sta_connections, (uint8_t)node_ptr->node_device_is_center_root, (uint8_t)node_ptr->node_device_is_apsta, AP);
+    device_set_rssi_threshold(node_ptr->node_device_ptr, rm_get_local_rssi_threshold());
     device_set_network_ap(node_ptr->node_device_ptr, network_cidr, network_gateway, network_mask);
     device_start_ap(node_ptr->node_device_ptr);
-    device_set_max_tx_power(node_ptr->node_device_ptr, 80);
+    device_set_max_tx_power(node_ptr->node_device_ptr, rm_get_local_antenna_power());
   } else {
     // Start the loop task the first time, otherwise simply switch back to AP mode on subsequent calls
     if(!node_ptr->node_device_is_apsta) {
@@ -237,9 +269,10 @@ void node_set_as_ap(uint32_t network, uint32_t mask){
       ESP_ERROR_CHECK(started == pdPASS ? ESP_OK : ESP_ERR_NO_MEM);
     }
     device_init(node_ptr->node_device_ptr, node_ptr->node_device_uuid, node_ptr->node_device_orientation, wifi_network_prefix, wifi_network_password, ap_channel_to_emit, ap_max_sta_connections, (uint8_t)node_ptr->node_device_is_center_root, (uint8_t)node_ptr->node_device_is_apsta, AP);
+    device_set_rssi_threshold(node_ptr->node_device_ptr, rm_get_local_rssi_threshold());
     device_set_network_ap(node_ptr->node_device_ptr, network_cidr, network_gateway, network_mask);
     device_start_ap(node_ptr->node_device_ptr);
-    device_set_max_tx_power(node_ptr->node_device_ptr, 80);
+    device_set_max_tx_power(node_ptr->node_device_ptr, rm_get_local_antenna_power());
   }
 
   if(node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER) {

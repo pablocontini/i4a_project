@@ -33,6 +33,7 @@ struct Station {
   bool is_apsta;
   bool event_handlers_registered;
   bool stopping;
+  int8_t rssi_threshold_dbm;
   Station_State state;
   wifi_config_t wifi_config;
   wifi_ap_record_t wifi_ap_found;
@@ -46,6 +47,7 @@ typedef struct Station* StationPtr;
 
 void station_init(StationPtr stationPtr, const char* wifi_ssid_like, uint8_t orientation, const char* device_uuid, const char* password, bool is_apsta);
 void station_start(StationPtr stationPtr);
+void station_set_rssi_threshold(StationPtr stationPtr, int8_t threshold_dbm);
 void station_connect(StationPtr stationPtr);
 void station_disconnect(StationPtr stationPtr);
 void station_restart(StationPtr stationPtr);

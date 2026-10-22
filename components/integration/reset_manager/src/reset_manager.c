@@ -5,8 +5,13 @@
 #include "esp_mac.h"
 #include "esp_system.h"
 #include <string.h>
+#include <stdio.h>
+#include "config.h"
 #include "traffic.h"
 #include "reset_manager/reset_manager.h"
+
+void node_set_orientation_mode_requested(bool enabled);
+void node_set_configuration_mode_requested(bool enabled);
 
 #define ROOT_UUID "000000000000"
 
@@ -14,6 +19,23 @@ static const char *TAG = "reset_manager";
 
 static reset_manager_t reset_manager = {0};
 static reset_manager_t *rm = &reset_manager;
+static uint8_t local_tx_power_qdbm = RM_DEFAULT_TX_POWER_QDBM;
+static int8_t local_rssi_threshold_dbm = RM_DEFAULT_RSSI_THRESHOLD_DBM;
+
+static bool rm_radio_settings_are_valid(
+    const uint8_t power_qdbm[RM_DIRECTIONAL_ANTENNA_COUNT],
+    const int8_t rssi_threshold_dbm[RM_DIRECTIONAL_ANTENNA_COUNT]) {
+    static const uint8_t levels[] = {8, 20, 28, 34, 44, 52, 56, 60, 66, 72, 80};
+    if (power_qdbm == NULL || rssi_threshold_dbm == NULL) return false;
+    for (size_t i = 0; i < RM_DIRECTIONAL_ANTENNA_COUNT; i++) {
+        bool supported = false;
+        for (size_t j = 0; j < sizeof(levels); j++) {
+            if (power_qdbm[i] == levels[j]) supported = true;
+        }
+        if (!supported || rssi_threshold_dbm[i] > -1) return false;
+    }
+    return true;
+}
 
 #define RESET_TIMEOUT_US 30000000 // 30 Seconds
 #define RESET_BROADCAST_WAIT_MS 2000 // 2 Seconds
@@ -52,11 +74,25 @@ static void rm_on_sibling_message(void *ctx, const uint8_t *msg, uint16_t len) {
                 ESP_LOGW(TAG, "Invalid startup message length: %d", len);
                 return;
             } else {
-                const rm_startup_packet_t *startup = (const rm_startup_packet_t *)msg;
+                rm_startup_packet_t startup;
+                memcpy(&startup, msg, sizeof(startup));
+                if (startup.version != RM_STARTUP_PACKET_VERSION ||
+                    !rm_radio_settings_are_valid(startup.tx_power_qdbm,
+                                                 startup.rssi_threshold_dbm)) {
+                    ESP_LOGW(TAG, "Invalid startup version or radio settings");
+                    return;
+                }
 
-                strncpy(rm->uuid, startup->uuid, UUID_LENGTH);
+                strncpy(rm->uuid, startup.uuid, UUID_LENGTH);
                 rm->uuid[UUID_LENGTH - 1] = '\0';
-                rm->is_root = startup->is_root;
+                rm->is_root = startup.is_root;
+                node_set_orientation_mode_requested(startup.orientation_mode != 0);
+                node_set_configuration_mode_requested(startup.configuration_mode != 0);
+                config_id_t orientation = config_get_id();
+                if (orientation <= CONFIG_ID_WEST) {
+                    local_tx_power_qdbm = startup.tx_power_qdbm[orientation];
+                    local_rssi_threshold_dbm = startup.rssi_threshold_dbm[orientation];
+                }
                 ESP_LOGI(TAG, "Startup message received: UUID=%s, is_root=%d", rm->uuid, rm->is_root);
 
                 rm->is_up = true;
@@ -78,6 +114,8 @@ void rm_init(ring_share_t *rs) {
     rm->rs = rs;
     rm->is_up = false;
     rm->is_root = false;
+    local_tx_power_qdbm = RM_DEFAULT_TX_POWER_QDBM;
+    local_rssi_threshold_dbm = RM_DEFAULT_RSSI_THRESHOLD_DBM;
     rm->last_reset_time = esp_timer_get_time();
     rm_generate_uuid_from_mac(rm->mac, sizeof(rm->mac));
     memset(rm->uuid, 0, sizeof(rm->uuid));
@@ -112,14 +150,22 @@ bool rm_broadcast_reset(void) {
     return result;
 }
 
-bool rm_broadcast_startup_info(bool is_root) {
+bool rm_broadcast_startup_info(
+    bool is_root, bool orientation_mode, bool configuration_mode,
+    const uint8_t tx_power_qdbm[RM_DIRECTIONAL_ANTENNA_COUNT],
+    const int8_t rssi_threshold_dbm[RM_DIRECTIONAL_ANTENNA_COUNT]) {
     if (!rm->rs) {
         ESP_LOGW(TAG, "STARTUP broadcast skipped: manager not initialized");
         return false;
     }
 
-    rm_startup_packet_t packet;
+    if (!rm_radio_settings_are_valid(tx_power_qdbm, rssi_threshold_dbm)) {
+        ESP_LOGW(TAG, "STARTUP broadcast rejected: invalid radio settings");
+        return false;
+    }
+    rm_startup_packet_t packet = {0};
     packet.opcode = RM_OPCODE_STARTUP;
+    packet.version = RM_STARTUP_PACKET_VERSION;
     
     if(is_root){
         strncpy(rm->uuid, ROOT_UUID, sizeof(rm->uuid));
@@ -129,6 +175,11 @@ bool rm_broadcast_startup_info(bool is_root) {
     
     strncpy(packet.uuid, rm->uuid, sizeof(packet.uuid));
     packet.is_root = is_root ? 1 : 0;
+    packet.orientation_mode = orientation_mode ? 1 : 0;
+    packet.configuration_mode = configuration_mode ? 1 : 0;
+    memcpy(packet.tx_power_qdbm, tx_power_qdbm, sizeof(packet.tx_power_qdbm));
+    memcpy(packet.rssi_threshold_dbm, rssi_threshold_dbm,
+           sizeof(packet.rssi_threshold_dbm));
     rm->is_root = is_root;
 
     bool broadcast = rs_broadcast(rm->rs, RS_RESET_MANAGER, (uint8_t *)&packet, sizeof(packet));
@@ -144,6 +195,14 @@ bool rm_broadcast_startup_info(bool is_root) {
 bool rm_should_device_reset(void){
     int64_t current_time = esp_timer_get_time();
     return ((current_time - rm->last_reset_time) > RESET_TIMEOUT_US);
+}
+
+uint8_t rm_get_local_antenna_power(void) {
+    return local_tx_power_qdbm;
+}
+
+int8_t rm_get_local_rssi_threshold(void) {
+    return local_rssi_threshold_dbm;
 }
 
 bool rm_is_device_up(void) {

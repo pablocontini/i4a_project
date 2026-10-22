@@ -1,0 +1,5 @@
+#ifndef NATIVE_PORTAL_INFO_MANAGER_INFO_MANAGER_H
+#define NATIVE_PORTAL_INFO_MANAGER_INFO_MANAGER_H
+void im_http_client_start(void);
+
+#endif

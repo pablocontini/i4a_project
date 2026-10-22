@@ -77,6 +77,7 @@ int8_t device_get_rssi(DevicePtr device_ptr);
 const char *device_get_link_name(DevicePtr device_ptr);
 uint8_t device_get_channel(DevicePtr device_ptr);
 void device_set_max_tx_power(DevicePtr device_ptr, int8_t power);
+void device_set_rssi_threshold(DevicePtr device_ptr, int8_t threshold_dbm);
 void device_enable_ap(DevicePtr device_ptr);
 void device_disable_ap(DevicePtr device_ptr);
 void device_enable_station(DevicePtr device_ptr);

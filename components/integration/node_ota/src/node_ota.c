@@ -30,6 +30,7 @@ static SemaphoreHandle_t exchange_lock;
 static ota_receiver_t receiver;
 static bool serial_started;
 static volatile bool application_ready;
+static volatile bool updates_allowed = true;
 static bool maintenance;
 static uint32_t maintenance_session;
 static int64_t maintenance_activity;
@@ -43,6 +44,12 @@ static unsigned reported_drops, reported_invalid;
 /* Latched only for the first boot of a newly selected OTA image. Cleared by
  * the next boot, when otadata already marks this image valid. */
 static bool boot_recovery_pending;
+
+void node_ota_set_updates_allowed(bool allowed) { updates_allowed = allowed; }
+
+bool node_ota_can_switch_mode(void) {
+    return ring && application_ready && !rs_boot_quiet(ring) && !rs_maintenance(ring);
+}
 
 _Static_assert(NODE_OTA_MAX_PACKET + 1 <= 512, "Must fit sibling callback queue");
 
@@ -107,7 +114,7 @@ static void expire_receiver(void)
 static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *reply)
 {
     expire_receiver();
-    if (request->op == NODE_OTA_BEGIN && (!application_ready || rs_boot_quiet(ring))) {
+    if (request->op == NODE_OTA_BEGIN && (!updates_allowed || !application_ready || rs_boot_quiet(ring))) {
         memset(reply, 0, sizeof(*reply));
         reply->op = request->op | NODE_OTA_REPLY;
         reply->targets = request->targets;
@@ -204,6 +211,7 @@ esp_err_t node_ota_init(ring_share_t *rs, uint8_t device_role)
     if (ring || !rs || device_role > NODE_OTA_CENTER) return ESP_ERR_INVALID_STATE;
     role = device_role;
     application_ready = false;
+    updates_allowed = true;
     maintenance = false;
     maintenance_session = 0;
     boot_release_at = 0;
@@ -230,7 +238,7 @@ esp_err_t node_ota_exchange(const node_ota_packet_t *request,
 {
     if (!ring || role != NODE_OTA_CENTER) return ESP_ERR_INVALID_STATE;
     if (!request || !emit || !valid_request(request)) return ESP_ERR_INVALID_ARG;
-    if (request->op == NODE_OTA_BEGIN && (!application_ready || rs_boot_quiet(ring))) {
+    if (request->op == NODE_OTA_BEGIN && (!updates_allowed || !application_ready || rs_boot_quiet(ring))) {
         node_ota_packet_t reply;
         handle_request(request, &reply);
         emit(&reply, context);

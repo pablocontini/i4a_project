@@ -18,6 +18,8 @@
 #include "node_ota/node_ota.h"
 #include "neighbor_manager/neighbor_manager.h"
 #include "capture_diagnostics.h"
+#include "config_portal/config_portal.h"
+#include "antenna_orientation_mode/antenna_orientation_mode.h"
 
 #define ROOT_NETWORK 0x0A000000  // 10.0.0.0
 #define ROOT_MASK 0xFF000000 // 255.0.0.0
@@ -64,6 +66,19 @@ void app_main(void) {
     routing_t *rt = node_get_rt_instance();
     node_device_orientation_t orientation = node_get_device_orientation();
     bool is_center_root = node_is_device_center_root();
+
+    if (node_is_configuration_mode_enabled() || node_is_orientation_mode_enabled()) {
+        node_ota_set_updates_allowed(false);
+        /* Dedicated APs use normal lwIP selection, without normal routing. */
+        node_set_routing_hook(ROUTING_HOOK_WIFI_NETIF_DEFAULT);
+        ESP_ERROR_CHECK(node_ota_confirm_boot());
+        if (node_is_orientation_mode_enabled())
+            antenna_orientation_mode_run(rs);
+        else if (orientation == NODE_DEVICE_ORIENTATION_CENTER)
+            ESP_ERROR_CHECK(config_portal_run());
+        ESP_ERROR_CHECK(node_ota_start_serial());
+        return;
+    }
 
     ESP_ERROR_CHECK(nm_init(rs, orientation, node_get_uuid()) ? ESP_OK : ESP_ERR_NO_MEM);
 

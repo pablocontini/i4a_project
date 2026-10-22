@@ -66,7 +66,7 @@ void device_init(DevicePtr device_ptr, const char *device_uuid, uint8_t device_o
   device_ptr->access_point = ap;
   device_ptr->access_point_ptr = &device_ptr->access_point;
 
-  Station station = {};
+  Station station = { .rssi_threshold_dbm = -128 };
   device_ptr->station = station;
   device_ptr->station_ptr = &device_ptr->station;
   
@@ -401,6 +401,11 @@ void device_set_max_tx_power(DevicePtr device_ptr, int8_t power) {
   // Convert to real dBm
   float real_dbm = power * 0.25f;
   ESP_LOGI(LOGGING_TAG, "Wi-Fi max TX power set to %.2f dBm", real_dbm);
+}
+
+void device_set_rssi_threshold(DevicePtr device_ptr, int8_t threshold_dbm) {
+  if (device_ptr && device_ptr->station_ptr)
+    station_set_rssi_threshold(device_ptr->station_ptr, threshold_dbm);
 }
 
 // Disable STA interface at runtime

@@ -42,6 +42,7 @@ def main():
                  "test_exchange_maintenance_timeout_and_failed_begin",
                  "test_exchange_reboot_requires_every_successful_ack",
                  "test_begin_waits_for_application_ready",
+                 "test_begin_special_mode_is_read_only_and_mode_switch_waits_for_ota",
                  "test_boot_recovery_without_ring_and_no_restart_loop",
                  "test_boot_failure_keeps_rollback_deadline",
                  "test_boot_barrier_waits_for_every_confirmed_board",
