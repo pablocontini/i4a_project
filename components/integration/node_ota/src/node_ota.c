@@ -44,6 +44,11 @@ static unsigned reported_drops, reported_invalid;
 /* Latched only for the first boot of a newly selected OTA image. Cleared by
  * the next boot, when otadata already marks this image valid. */
 static bool boot_recovery_pending;
+static node_radio_cut_fn radio_cut_handler;
+static bool radio_cut_cached;
+static node_ota_packet_t radio_cut_request, radio_cut_reply;
+
+void node_ota_register_radio_cut(node_radio_cut_fn handler) { radio_cut_handler = handler; }
 
 void node_ota_set_updates_allowed(bool allowed) { updates_allowed = allowed; }
 
@@ -114,6 +119,39 @@ static void expire_receiver(void)
 static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *reply)
 {
     expire_receiver();
+    if (request->op == NODE_OTA_RADIO_CUT) {
+        if (radio_cut_cached && request->session == radio_cut_request.session &&
+            request->sequence == radio_cut_request.sequence &&
+            request->targets == radio_cut_request.targets &&
+            request->length == radio_cut_request.length &&
+            !memcmp(request->data, radio_cut_request.data, request->length)) {
+            *reply = radio_cut_reply;
+            return;
+        }
+        memset(reply, 0, sizeof(*reply));
+        reply->op = request->op | NODE_OTA_REPLY;
+        reply->targets = request->targets;
+        reply->sender = role;
+        reply->session = request->session;
+        reply->sequence = request->sequence;
+        reply->length = 5;
+        reply->data[4] = receiver.phase;
+        esp_err_t err = ESP_ERR_INVALID_STATE;
+        if (updates_allowed && application_ready && !rs_boot_quiet(ring) && !maintenance &&
+            !boot_recovery_pending && receiver.phase == NODE_OTA_IDLE) {
+            err = role == NODE_OTA_CENTER ? ESP_OK :
+                (radio_cut_handler ? radio_cut_handler(node_ota_get_u32(request->data)) : ESP_ERR_INVALID_STATE);
+        }
+        node_ota_put_u32(reply->data, err);
+        if (err == ESP_OK) {
+            radio_cut_request = *request;
+            radio_cut_reply = *reply;
+            radio_cut_cached = true;
+        }
+        diagnostic("event=radio_cut_queued seconds=%lu error=0x%lx",
+                   (unsigned long)node_ota_get_u32(request->data), (unsigned long)err);
+        return;
+    }
     if (request->op == NODE_OTA_BEGIN && (!updates_allowed || !application_ready || rs_boot_quiet(ring))) {
         memset(reply, 0, sizeof(*reply));
         reply->op = request->op | NODE_OTA_REPLY;
@@ -164,6 +202,13 @@ static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *
 
 static bool valid_request(const node_ota_packet_t *p)
 {
+    if (p->op == NODE_OTA_RADIO_CUT) {
+        unsigned radios = p->targets & 0x0f;
+        return p->sender == NODE_OTA_HOST && p->length == 4 &&
+            node_ota_get_u32(p->data) <= 300 && p->offset == 0 &&
+            (p->targets & (1U << NODE_OTA_CENTER)) && !(p->targets & ~NODE_OTA_ROLES) &&
+            radios && !(radios & (radios - 1));
+    }
     return ((p->sender == NODE_OTA_HOST && p->op >= NODE_OTA_INFO && p->op <= NODE_OTA_REBOOT) ||
             (p->sender == NODE_OTA_CENTER && p->op == BOOT_RESUME_OP && p->length == 0)) &&
            p->length <= NODE_OTA_CHUNK &&
@@ -212,6 +257,7 @@ esp_err_t node_ota_init(ring_share_t *rs, uint8_t device_role)
     role = device_role;
     application_ready = false;
     updates_allowed = true;
+    radio_cut_cached = false;
     maintenance = false;
     maintenance_session = 0;
     boot_release_at = 0;
@@ -412,7 +458,8 @@ static void serial_line(char *line, size_t length)
         diagnostic("event=serial_invalid_packet bytes=%u", (unsigned)bytes);
         return;
     }
-    if (request.sender != NODE_OTA_HOST || request.op < NODE_OTA_INFO || request.op > NODE_OTA_REBOOT) {
+    if (request.sender != NODE_OTA_HOST ||
+        !((request.op >= NODE_OTA_INFO && request.op <= NODE_OTA_REBOOT) || request.op == NODE_OTA_RADIO_CUT)) {
         diagnostic("event=serial_invalid_request sender=%u op=%u", request.sender, request.op);
         return;
     }

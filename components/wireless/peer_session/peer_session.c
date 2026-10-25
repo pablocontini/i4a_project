@@ -7,12 +7,19 @@
 #include "lwip/sockets.h"
 #include "node.h"
 
-#define HELLO_SIZE 24
-#define HELLO_VERSION 1
+#define HELLO_SIZE 32
+#define HELLO_VERSION 2
 #define IO_TIMEOUT_MS 5000
 #define RENEW_MS 5000
 
 static uint64_t now_ms(void) { return (uint64_t)esp_timer_get_time() / 1000; }
+
+static uint32_t read_u32(const uint8_t *data) {
+    return (uint32_t)data[0] << 24 | (uint32_t)data[1] << 16 | (uint32_t)data[2] << 8 | data[3];
+}
+static void write_u32(uint8_t *data, uint32_t value) {
+    data[0] = value >> 24; data[1] = value >> 16; data[2] = value >> 8; data[3] = value;
+}
 
 bool peer_session_init(peer_session_t *session) {
     memset(session, 0, sizeof(*session));
@@ -94,6 +101,8 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
             session->sock = sock;
             session->admitted = false;
             memset(&session->link, 0, sizeof(session->link));
+            session->provided_network = (nm_network_t){0};
+            session->peer_network = (nm_network_t){0};
             started = true;
         }
     });
@@ -116,11 +125,23 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
     uint32_t token = station ? esp_random() : 0;
     if (station && !token) token = 1;
     hello[20] = token >> 24; hello[21] = token >> 16; hello[22] = token >> 8; hello[23] = token;
+    nm_network_t local_network = {0};
+    if (node_is_network_provided()) {
+        local_network.mask = node_get_device_mask() << 3;
+        local_network.addr = node_get_device_subnet() & local_network.mask;
+        if (!nm_network_valid(local_network)) return false;
+    }
+    write_u32(hello + 24, local_network.addr);
+    write_u32(hello + 28, local_network.mask);
     uint8_t remote[HELLO_SIZE];
-    if (!write_all(sock, hello, sizeof(hello)) || !read_exact(session, remote, sizeof(remote), false) ||
+    if (!write_all(sock, hello, sizeof(hello)) || !read_exact(session, remote, 24, false) ||
         memcmp(remote, "I4AN", 4) || remote[4] != HELLO_VERSION ||
         remote[5] != (station ? 0 : 1) || remote[6] >= NM_RADIOS || remote[7] != 0)
         return false;
+    if (!read_exact(session, remote + 24, 8, false)) return false;
+    nm_network_t peer_network = {read_u32(remote + 24), read_u32(remote + 28)};
+    if ((peer_network.addr || peer_network.mask) && !nm_network_valid(peer_network)) return false;
+    if ((!station && !local_network.mask) || (station && !peer_network.mask)) return false;
     char peer_uuid[NM_UUID_LEN + 1] = {0};
     memcpy(peer_uuid, remote + 8, NM_UUID_LEN);
     if (!nm_uuid_valid(peer_uuid) || !memcmp(peer_uuid, uuid, NM_UUID_LEN + 1)) return false;
@@ -143,10 +164,17 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
     link->ap_orientation = station ? remote[6] : hello[6];
 
     if (!vote(session, nm_reserve(peer_uuid, link)) ||
-        !vote(session, usable(session) && nm_commit(link)) ||
+        !vote(session, usable(session) && nm_commit(link)))
+        return false;
+    nm_network_t offer = {0};
+    bool allocated = station || (usable(session) &&
+        nm_provide_block(link, local_network, peer_network, &offer));
+    if (!vote(session, allocated) ||
         !vote(session, usable(session) && nm_activate(link)) || !nm_owns(link))
         return false;
     WITH_LOCK(&session->write_lock, {
+        session->provided_network = offer;
+        session->peer_network = station ? peer_network : offer;
         session->admitted = !session->stopping;
         started = session->admitted;
     });
@@ -157,11 +185,37 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
 void peer_session_close(peer_session_t *session) {
     WITH_LOCK(&session->write_lock, {
         session->admitted = false;
+        session->provided_network = (nm_network_t){0};
+        session->peer_network = (nm_network_t){0};
         if (session->sock >= 0) shutdown(session->sock, SHUT_RDWR);
         session->sock = -1;
     });
     if (session->link.session) nm_release(&session->link);
     memset(&session->link, 0, sizeof(session->link));
+}
+
+bool peer_session_provision_offer(peer_session_t *session, uint32_t *network, uint32_t *mask) {
+    bool valid = false;
+    *network = *mask = 0;
+    WITH_LOCK(&session->write_lock, {
+        if (session->admitted && !session->stopping) {
+            *network = session->provided_network.addr;
+            *mask = session->provided_network.mask;
+            valid = nm_network_valid(session->provided_network);
+        }
+    });
+    return valid;
+}
+
+bool peer_session_check_peer_network(peer_session_t *session, uint32_t network, uint32_t mask) {
+    bool matches = false;
+    WITH_LOCK(&session->write_lock, {
+        matches = session->admitted && !session->stopping &&
+            session->peer_network.addr == network && session->peer_network.mask == mask;
+        if (!matches && session->admitted && session->sock >= 0)
+            shutdown(session->sock, SHUT_RDWR);
+    });
+    return matches;
 }
 
 int peer_session_receive(peer_session_t *session, uint8_t *buffer, uint16_t capacity) {

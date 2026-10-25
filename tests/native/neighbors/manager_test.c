@@ -24,6 +24,21 @@ static struct { nm_message_t items[NM_QUEUE_LENGTH]; unsigned count; } pending;
 static bool in_callback;
 static unsigned callback_broadcasts, broadcasts;
 static int task_result = pdPASS;
+static nm_blocks_t durable_blocks;
+static bool durable_present, store_failure;
+static unsigned store_writes;
+
+bool nm_block_store_load(const char *uuid, nm_blocks_t *blocks) {
+    if (durable_present) { *blocks = durable_blocks; return nm_blocks_valid(blocks, uuid); }
+    nm_blocks_init(blocks, uuid);
+    return true;
+}
+bool nm_block_store_save(const nm_blocks_t *blocks) {
+    ++store_writes;
+    /* Model an ambiguous failed commit: bytes may already be durable. */
+    durable_blocks = *blocks; durable_present = true;
+    return !store_failure;
+}
 
 QueueHandle_t xQueueCreate(unsigned length, size_t size) {
     if (length != NM_QUEUE_LENGTH || size != sizeof(nm_message_t)) return NULL;
@@ -113,6 +128,8 @@ static void reset(void) {
     in_callback = false;
     broadcasts = callback_broadcasts = 0;
     task_result = pdPASS;
+    durable_present = store_failure = false;
+    store_writes = 0;
     for (int radio = 0; radio <= NM_CENTER; ++radio) {
         nm_init(&rings[radio], radio, "A00000000000");
         states[radio] = manager;
@@ -124,6 +141,96 @@ static nm_link_id_t new_link(uint8_t sta, uint8_t ap, uint32_t token) {
     nm_link_id_t link = { .initiator_uuid = "A00000000000", .station_orientation = sta,
                          .ap_orientation = ap, .session = token };
     return link;
+}
+
+static nm_link_id_t admitted_ap(unsigned ap, const char *peer, uint32_t token) {
+    nm_link_id_t link = {.station_orientation=0,.ap_orientation=ap,.session=token};
+    memcpy(link.initiator_uuid, peer, NM_UUID_LEN+1);
+    switch_to(ap);
+    if (!nm_reserve(peer, &link) || !nm_commit(&link)) link.session=0;
+    return link;
+}
+
+EXPORT int test_block_rpc_serializes_radios_and_preserves_uuid_after_release(void) {
+    reset();
+    nm_network_t root={0x0A000000,0xFF000000}, empty={0}, grillo, other, moved;
+    nm_link_id_t first=admitted_ap(2,"B00000000000",11);
+    CHECK(first.session && nm_provide_block(&first,root,empty,&grillo));
+    CHECK(grillo.addr==0x0A600000 && store_writes==1);
+    CHECK(nm_activate(&first)); nm_release(&first);
+    /* Address ownership survives release/lease expiry and a different radio. */
+    clock_ms+=NM_ACTIVE_MS;
+    nm_link_id_t next=admitted_ap(1,"B00000000000",12);
+    CHECK(next.session && nm_provide_block(&next,root,grillo,&moved));
+    CHECK(moved.addr==grillo.addr && store_writes==1);
+    nm_link_id_t ramona=admitted_ap(2,"C00000000000",13);
+    CHECK(ramona.session && nm_provide_block(&ramona,root,empty,&other));
+    CHECK(other.addr!=grillo.addr && store_writes==2 && callback_broadcasts==0);
+    CHECK(!nm_provide_block(&ramona,root,grillo,&other));
+    return 0;
+}
+
+EXPORT int test_lost_block_reply_retries_the_same_durable_reservation(void) {
+    reset();
+    nm_network_t root={0x0A000000,0xFF000000}, empty={0}, offer;
+    nm_link_id_t link=admitted_ap(2,"B00000000000",21);
+    CHECK(link.session);
+    drop_snapshots=true;
+    CHECK(!nm_provide_block(&link,root,empty,&offer));
+    CHECK(!offer.addr && store_writes==1 && durable_present);
+    drop_snapshots=false;
+    CHECK(nm_provide_block(&link,root,empty,&offer));
+    CHECK(offer.addr==0x0A600000 && store_writes==1);
+    return 0;
+}
+
+EXPORT int test_block_store_failure_is_fail_closed_until_reload(void) {
+    reset();
+    nm_network_t root={0x0A000000,0xFF000000}, empty={0}, offer;
+    nm_link_id_t link=admitted_ap(2,"B00000000000",31);
+    store_failure=true;
+    CHECK(!nm_provide_block(&link,root,empty,&offer));
+    CHECK(!offer.addr && durable_present);
+    store_failure=false;
+    CHECK(!nm_provide_block(&link,root,empty,&offer));
+    /* A center reload retains the committed reservation instead of reusing it. */
+    nm_blocks_t saved=durable_blocks;
+    reset();
+    durable_blocks=saved; durable_present=true;
+    switch_to(NM_CENTER);
+    CHECK(nm_init(&rings[NM_CENTER],NM_CENTER,"A00000000000"));
+    link=admitted_ap(0,"B00000000000",32);
+    CHECK(link.session && nm_provide_block(&link,root,empty,&offer));
+    CHECK(offer.addr==0x0A600000 && store_writes==0);
+    return 0;
+}
+
+EXPORT int test_simultaneous_block_requests_are_serialized_before_offers(void) {
+    for (unsigned reverse=0;reverse<2;++reverse) {
+        reset();
+        nm_network_t root={0x0A000000,0xFF000000}, empty={0}, allocated;
+        nm_link_id_t grillo=admitted_ap(2,"B00000000000",41);
+        CHECK(grillo.session && nm_provide_block(&grillo,root,empty,&allocated));
+        nm_release(&grillo);
+        nm_link_id_t east=admitted_ap(2,"C00000000000",42);
+        nm_link_id_t north=admitted_ap(0,"D00000000000",43);
+        CHECK(east.session && north.session);
+        nm_message_t requests[2]={
+            {.command=NM_PROVIDE_BLOCK,.owner=2,.request=100,.link=east,.parent=root},
+            {.command=NM_PROVIDE_BLOCK,.owner=0,.request=101,.link=north,.parent=root}};
+        switch_to(NM_CENTER);
+        in_callback=true;
+        on_message(NULL,(const uint8_t *)&requests[reverse],sizeof(nm_message_t));
+        on_message(NULL,(const uint8_t *)&requests[!reverse],sizeof(nm_message_t));
+        in_callback=false;
+        CHECK(pending.count==2);
+        process_pending(0); nm_network_t first=last_snapshot.offer;
+        CHECK(last_snapshot.accepted && first.addr!=allocated.addr);
+        process_pending(0); nm_network_t second=last_snapshot.offer;
+        CHECK(last_snapshot.accepted && second.addr!=first.addr && second.addr!=allocated.addr);
+        CHECK(store_writes==3 && callback_broadcasts==0);
+    }
+    return 0;
 }
 
 EXPORT int test_spi_reservations_snapshots_and_release(void) {

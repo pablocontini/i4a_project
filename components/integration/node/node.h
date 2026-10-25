@@ -40,6 +40,10 @@ bool node_is_sta_locked(void); // Returns whether the STA interface is enabled o
 bool node_is_ap_locked(void); // Returns whether the AP interface is enabled or not
 bool node_is_device_apsta(void); // Returns whether the device is on AP+STA mode or not
 bool node_is_network_provided(void); // Returns whether the device has been assigned a network address or not
+/* True for AP sessions, including an unavailable (0/0) offer: never fall back
+ * to handing out the physical radio subnet without a durable reservation. */
+bool node_get_peer_provision_offer(uint32_t *network, uint32_t *mask);
+bool node_check_peer_network(uint32_t network, uint32_t mask);
 
 // Node parameters
 node_device_orientation_t node_get_device_orientation(void); // Orientation of node's specific device

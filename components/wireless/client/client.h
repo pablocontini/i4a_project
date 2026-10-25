@@ -10,6 +10,8 @@ extern "C" {
 void client_open();
 void client_close();
 void client_wait_stopped(void);
+bool client_is_peer_admitted(void);
+bool client_check_peer_network(uint32_t network, uint32_t mask);
 bool client_send_message(const uint8_t *msg, uint16_t len);
 
 #ifdef __cplusplus

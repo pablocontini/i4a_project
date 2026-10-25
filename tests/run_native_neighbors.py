@@ -17,6 +17,13 @@ def main():
     build.mkdir(parents=True, exist_ok=True)
     component = ROOT / "components/integration/neighbor_manager"
     suites = {
+        "block_store": ("test_block_store_preserves_owner_across_reload_and_rejects_corruption",
+                        "test_block_store_io_failure_never_reports_a_successful_commit"),
+        "blocks": ("test_blocks_identity_survives_mobility_and_new_neighbor",
+                   "test_blocks_conflicting_owner_and_invalid_networks_are_rejected",
+                   "test_blocks_imports_existing_owner_and_preserves_descendant_routes",
+                   "test_blocks_exhaustion_never_reuses_a_live_owner_or_client_sector",
+                   "test_blocks_changed_parent_cannot_delegate_its_own_network_or_clients"),
         "spi": ("test_spi_keeps_dma_receives_queued_and_drops_truncated_frames",
                 "test_spi_rearms_when_application_retains_all_receive_buffers",
                 "test_spi_full_delivery_queue_drops_without_leaking_or_delaying_rearm"),
@@ -30,9 +37,14 @@ def main():
                     "test_spi_incoming_identity_and_invalid_owner",
                     "test_neighbor_callback_defers_broadcast_and_handles_full_queue",
                     "test_neighbor_worker_failure_and_idle_expiry",
-                    "test_neighbor_duplicate_requests_and_frozen_leases"),
+                    "test_neighbor_duplicate_requests_and_frozen_leases",
+                    "test_block_rpc_serializes_radios_and_preserves_uuid_after_release",
+                    "test_lost_block_reply_retries_the_same_durable_reservation",
+                    "test_block_store_failure_is_fail_closed_until_reload",
+                    "test_simultaneous_block_requests_are_serialized_before_offers"),
         "session": ("test_identity_admission_both_roles_and_framing", "test_duplicate_and_lost_reservation_never_admit",
-                    "test_incompatible_identity_and_incomplete_frames", "test_expired_or_unrenewed_session_stops_transport"),
+                    "test_incompatible_identity_and_incomplete_frames", "test_expired_or_unrenewed_session_stops_transport",
+                    "test_session_allocation_precedes_admission_and_clears_stale_offer"),
         "channel": ("test_scan_cooldown_and_channel_independence",),
         "callbacks": ("test_peer_callbacks_preserve_session_order",
                       "test_sibling_callbacks_reject_invalid_lengths_and_copy_maximum"),
@@ -56,9 +68,11 @@ def main():
                         "routing/wireless/include", "routing/siblings/include"):
             command += ["-I", str(ROOT / "components" / include)]
         command += [str(ROOT / f"tests/native/neighbors/{suite}_test.c"),
-                    str(component / "src/registry.c")]
+                    str(component / "src/registry.c"), str(component / "src/blocks.c")]
         if suite == "session":
             command += [str(ROOT / "components/wireless/peer_session/peer_session.c")]
+        if suite == "block_store":
+            command += [str(component / "src/block_store.c")]
         command += ["-o", str(library)]
         subprocess.run(command, check=True)
         native = ctypes.CDLL(str(library))

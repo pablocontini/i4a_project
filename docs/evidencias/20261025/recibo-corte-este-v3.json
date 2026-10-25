@@ -1,0 +1,11 @@
+﻿{
+    "capture":  "C:\\Users\\jp\\OneDrive\\Documentos\\GitHub(t480)\\i4a_project\\.worktrees\\comnetar-stability-tools\\app\\build\\capturas\\corte-este-v3-20261025-192458-5867",
+    "archive":  "C:\\Users\\jp\\OneDrive\\Documentos\\GitHub(t480)\\i4a_project\\.worktrees\\comnetar-stability-tools\\app\\build\\capturas\\corte-este-v3-20261025-192458-5867-evidencia.zip",
+    "bytes":  271104,
+    "sha256":  "07f80339b504a75c537378ae199f35f3ee2b7200638c5e4ee8b0a863ecea47bd",
+    "files":  26,
+    "state":  "completed_existing_alternate_failover_verified",
+    "cut_seconds":  60,
+    "internet_recovery_seconds":  18.577,
+    "monitored_uptime_regressions":  0
+}

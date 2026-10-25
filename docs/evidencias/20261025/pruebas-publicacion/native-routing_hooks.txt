@@ -1,0 +1,5 @@
+test_no_route_never_falls_back_to_default_spi: OK
+test_selected_interface_unavailable_discards_without_fallback: OK
+test_explicit_wifi_and_spi_routes_still_transmit: OK
+test_normal_wifi_and_custom_hooks_preserve_lwip_fallback: OK
+test_home_and_root_interface_loss_discard: OK

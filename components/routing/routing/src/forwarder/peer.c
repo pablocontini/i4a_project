@@ -10,6 +10,17 @@
 
 static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event);
 
+static bool should_adopt_gateway(routing_t *self, uint32_t candidate_dtr) {
+    uint32_t current_dtr = GET_STATE(self)->dtr;
+    if (current_dtr == 0 || candidate_dtr < current_dtr) return true;
+    if (candidate_dtr != current_dtr) return false;
+
+    /* An idle sibling can retain its old DTR after the shared table loses
+     * the uplink. Equal distance restores a missing route, without replacing
+     * a working gateway or requiring delivery of a prior SPI request. */
+    return rt_fwd_default_missing(self);
+}
+
 void rt_fwd_publish_provision(routing_t *self) {
     rt_forwarder_state_t *state = GET_STATE(self);
     rt_sibl_event_t provision = {
@@ -42,11 +53,18 @@ static void on_peer_connected(routing_t *self, const network_t *connection) {
         },
     };
 
+    /* Address ownership outlives the radio link. Admission reserves this
+     * logical block by peer UUID before any routing handshake is allowed. */
+    (void)wl_get_provision_offer(self->deps.wl, &peer_event.payload.handshake.provided_network.addr,
+                               &peer_event.payload.handshake.provided_network.mask);
+
     wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
 }
 
 static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!wl_check_peer_network(self->deps.wl, event->external_network.addr,
+                               event->external_network.mask)) return;
 
     if (state->global_state == GLOBAL_STATE_WITHOUT_NETWORK) {
         if (event->dtr == 0 || event->dtr >= UINT16_MAX)
@@ -86,17 +104,28 @@ static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
 
 static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
 
     uint32_t peer_dtr = event->dtr;
-    uint32_t my_dtr = state->dtr;
 
     if (peer_dtr == 0 || peer_dtr == UINT32_MAX) {
         // Peer is not connected to the network
         return;
     }
 
-    if ((my_dtr == 0) || (peer_dtr + 1 < my_dtr)) {
-        // I'm not connected to the network or I can improve my DTR
+    if (rt_fwd_default_missing(self)) {
+        /* Await a response to our path request. A repeated handshake/DTR
+         * must not bypass confirmation or postpone the existing deadline. */
+        if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST &&
+            state->gateway_request_timeout != 0) return;
+        if (peer_dtr > 1) {
+            rt_fwd_request_own_gateway(self);
+            return;
+        }
+    }
+
+    if (should_adopt_gateway(self, peer_dtr + 1)) {
+        // Improve the path, or restore a missing default at equal distance.
         state->dtr = peer_dtr + 1;
         state->is_local_root = true;
         state->global_state = GLOBAL_STATE_WITH_NETWORK;
@@ -157,6 +186,9 @@ static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_re
 
 static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_response_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
+    if (!wl_check_peer_network(self->deps.wl, event->external_network.addr,
+                               event->external_network.mask)) return;
 
     uint32_t peer_dtr = event->dtr;
 
@@ -165,8 +197,8 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
     }
     uint32_t candidate_dtr = peer_dtr + 1;
 
-    if ((state->dtr != 0) && (state->dtr <= candidate_dtr)) {
-        // Keep the current gateway when the candidate is equal or worse.
+    if (!should_adopt_gateway(self, candidate_dtr)) {
+        // Keep a working gateway at equal distance; reject worse candidates.
         return;
     }
 

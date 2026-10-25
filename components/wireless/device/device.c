@@ -22,12 +22,10 @@ static volatile bool station_task_stop_requested;
 
 // Function to initialize NVS (non-volatile storage)
 static esp_err_t init_nvs() {
-  esp_err_t ret = nvs_flash_init();
-  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-    ESP_ERROR_CHECK(nvs_flash_erase());
-    ret = nvs_flash_init();
-  }
-  return ret;
+  /* Erasing NVS here used to be an automatic recovery. It also destroys
+   * durable block ownership while disconnected children can still use it.
+   * Preserve the partition and report the initialization error instead. */
+  return nvs_flash_init();
 }
 
 // Function to initialize the Wi-Fi interface

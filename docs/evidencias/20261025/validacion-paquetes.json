@@ -1,0 +1,48 @@
+{
+  "verified_utc": "2026-10-25T16:05:10.669807+00:00",
+  "status": "implemented_tested_built_not_deployed",
+  "native_tests": {
+    "routing-despues": 34,
+    "vecinos": 36,
+    "wireless": 7,
+    "hooks": 5,
+    "ota": 22
+  },
+  "native_total": 104,
+  "ota_c_python_compatibility": true,
+  "expected_before_patch_failures_confirmed": true,
+  "bundles": {
+    "grillo": {
+      "path": "app\\build\\link-capture\\grillo-bloques-reservados-v3-20261025",
+      "built_utc": "2026-10-25T16:02:44.432157+00:00",
+      "variant": "grillo",
+      "ssid": "ComNetAR - Grillo",
+      "diagnostics": true,
+      "source_worktree": "C:\\Users\\jp\\OneDrive\\Documentos\\GitHub(t480)\\i4a_project\\.worktrees\\comnetar-stability-tools",
+      "main_bin_sha256": "42437f3cda25591a2809a5041bb7c0a277b1282d54c9769768674eba5f9c7cbe",
+      "size": 905040,
+      "elf_sha256_reported_by_firmware": "4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+      "sources_zip_sha256": "c26e5ff1c258b8cd9fc9b580d4e19fa12741c9ddb2ae08fbeab7afc344585838",
+      "sources_match_working_tree": true
+    },
+    "ramona": {
+      "path": "app\\build\\link-capture\\ramona-bloques-reservados-v3-20261025",
+      "built_utc": "2026-10-25T16:03:50.506564+00:00",
+      "variant": "ramona",
+      "ssid": "ComNetAR - Ramona",
+      "diagnostics": true,
+      "source_worktree": "C:\\Users\\jp\\OneDrive\\Documentos\\GitHub(t480)\\i4a_project\\.worktrees\\comnetar-stability-tools",
+      "main_bin_sha256": "e698d8be8b450b9e5beb5d26dacfbeb2b2719703a4cc82e5d4b49537a5f4b656",
+      "size": 905040,
+      "elf_sha256_reported_by_firmware": "fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+      "sources_zip_sha256": "c26e5ff1c258b8cd9fc9b580d4e19fa12741c9ddb2ae08fbeab7afc344585838",
+      "sources_match_working_tree": true
+    }
+  },
+  "admission_protocol_version": 2,
+  "persistent_lease_schema": 1,
+  "serial_actions_performed": false,
+  "hardware_retest_performed": false,
+  "required_migration": "all five boards of Root, Grillo and Ramona",
+  "limitations": "No hardware validation of new allocation yet. Durable reservations are not automatically reclaimed; full tables reject new offers."
+}

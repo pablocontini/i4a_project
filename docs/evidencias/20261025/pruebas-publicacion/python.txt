@@ -1,0 +1,31 @@
+2026-10-25T22:31:20.605+00:00 port_added uplink: {'port': 'COM8', 'requested_utc': '2026-10-25T22:31:20.599+00:00'}
+2026-10-25T22:31:20.605+00:00 connected uplink: {'port': 'COM8'}
+2026-10-25T22:31:20.617+00:00 port_rejected host: {'request': '1b71d3739e7147228c90c5adad975d52.json', 'error': 'Use at most 4 ports'}
+2026-10-25T22:31:20.617+00:00 port_rejected host: {'request': '924fdbff70e94588a0ea60824eeb1f55.json', 'error': 'Use at most 4 ports'}
+2026-10-25T22:31:20.617+00:00 port_rejected host: {'request': 'fca6bf1af29e4b2a8799ea7184532120.json', 'error': 'Repeated label: esp0'}
+2026-10-25T22:31:20.635+00:00 connected esp: {'port': 'COM5'}
+2026-10-25T22:31:20.635+00:00 disconnected esp: {'port': 'COM5', 'error': 'unplugged'}
+2026-10-25T22:31:20.635+00:00 connected esp: {'port': 'COM5'}
+Capture: C:\Users\jp\AppData\Local\Temp\tmppsod66_u\session (Ctrl+C to stop)
+No UART commands are sent. Check connected events for all selected ports.
+2026-10-25T22:31:20.650+00:00 connected grillo: {'port': 'COM17'}
+2026-10-25T22:31:20.865+00:00 stop_requested host: {'requested_utc': '2026-10-25T22:31:20.653+00:00'}
+2026-10-25T22:31:20.979+00:00 connected esp0: {'port': 'COM0'}
+2026-10-25T22:31:20.979+00:00 connected esp1: {'port': 'COM1'}
+2026-10-25T22:31:20.979+00:00 connected esp2: {'port': 'COM2'}
+2026-10-25T22:31:20.979+00:00 connected esp3: {'port': 'COM3'}
+2026-10-25T22:31:21.040+00:00 connected esp: {'port': 'COM5'}
+2026-10-25T22:31:21.110+00:00 marker host: {'marked_utc': '2026-10-25T22:31:21.109+00:00', 'text': 'RAMONA_ON'}
+python : .............................................................
+En lÃ­nea: 2 CarÃ¡cter: 577
++ ...  exit 1} }; python -m unittest discover -s tests -p 'test_*.py' *> "$ ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (.................................:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+
+----------------------------------------------------------------------
+Ran 61 tests in 0.939s
+
+OK
+[flash] Puerto: COM7
+[flash] OK en COM7

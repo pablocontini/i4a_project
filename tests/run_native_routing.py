@@ -26,10 +26,13 @@ def main():
         "routing/routing_config/include", "routing/os/include", "routing/ring_share/include",
         "routing/shared_state/include", "routing/sync/include", "routing/wireless/include",
         "routing/siblings/include",
+        "integration/neighbor_manager/include",
     ):
         path = ROOT / include if include.startswith("tests/") else ROOT / "components" / include
         command += ["-I", str(path)]
     command += [str(ROOT / "tests/native/routing/recovery_test.c")]
+    command += [str(ROOT / "components/integration/neighbor_manager/src" / source)
+                for source in ("blocks.c", "registry.c")]
     for source in ("forwarder/forwarder.c", "forwarder/peer.c", "forwarder/sibling.c",
                    "root.c", "home.c", "routing.c", "routing_table.c", "utils.c"):
         command += [str(ROOT / "components/routing/routing/src" / source)]
@@ -38,6 +41,10 @@ def main():
     native = ctypes.CDLL(str(library))
     failures = []
     for name in (
+        "test_moved_block_is_not_redelegated_to_a_new_node",
+        "test_changed_peer_claim_cannot_steal_a_return_route",
+        "test_gateway_messages_cannot_replace_initial_network_provision",
+        "test_delayed_provision_cannot_renumber_a_node_during_gateway_recovery",
         "test_initial_uplink_counts_the_node_once",
         "test_home_restores_missing_client_route_without_restarting_ap",
         "test_home_does_not_invent_client_route_before_provision",
@@ -49,7 +56,13 @@ def main():
         "test_unprovisioned_peer_handshake_preserves_provider_gateway",
         "test_reconnected_provisioned_node_restores_gateway_without_renumbering",
         "test_sibling_gateway_winner_preserves_node_distance",
+        "test_new_radio_restores_missing_default_at_unchanged_distance",
+        "test_equal_distance_update_preserves_a_working_gateway",
+        "test_equal_gateway_response_restores_only_a_missing_default",
         "test_equal_or_unreachable_gateway_does_not_replace_uplink",
+        "test_late_longer_uplink_confirms_path_and_recovers",
+        "test_missing_default_tick_recovers_a_lost_sibling_request",
+        "test_late_recovery_path_returning_to_origin_is_rejected",
         "test_lost_original_uplink_recovers_through_existing_root_link",
         "test_route_and_destroy_use_mutex_addresses",
         "test_sibling_arrival_during_peer_batch_is_not_erased",

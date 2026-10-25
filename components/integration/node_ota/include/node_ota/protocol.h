@@ -23,6 +23,7 @@ enum node_ota_op {
     NODE_OTA_SELECT,
     NODE_OTA_ABORT,
     NODE_OTA_REBOOT,
+    NODE_OTA_RADIO_CUT = 9, /* Diagnostic control; does not enter OTA maintenance. */
 };
 
 enum node_ota_phase {

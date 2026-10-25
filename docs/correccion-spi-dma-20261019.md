@@ -262,3 +262,10 @@ python auxiliar/capture_links.py mark --output "$Captura" "RAMONA_ON: antes de e
 La marca `RAMONA_ON` debe preceder al encendido físico, aunque el monitor de
 Ramona se incorpore después. Mantener la conexión del PC en Grillo, sin
 autoconexión a Ramona. No cambiar firmware ni cables en medio de esta corrida.
+
+## Ensayo posterior de corte y recuperación
+
+El [informe del corte del 22/10 y la corrección del 23/10](prueba-corte-enlace-20261022.md)
+registra cuatro monitores, pings por Wi-Fi 3 y una falla reproducida: Grillo
+recuperó Root por Norte, pero quedó sin ruta por defecto. Incluye los tiempos,
+la evidencia conservada y la imagen corregida pendiente de validar en hardware.

@@ -559,3 +559,56 @@ EXPORT int test_boot_resume_cannot_be_injected_from_uart(void) {
     CHECK(!boot_release_at && broadcasts == 0 && test_boot_quiet);
     return 0;
 }
+
+static unsigned cut_calls;
+static uint32_t cut_seconds;
+static esp_err_t mock_radio_cut(uint32_t seconds) {
+    ++cut_calls;
+    cut_seconds = seconds;
+    return ESP_OK;
+}
+
+EXPORT int test_radio_cut_validation_retry_and_maintenance(void) {
+    node_ota_packet_t request, reply;
+    CHECK(setup(&request) == ESP_OK);
+    request.op = NODE_OTA_RADIO_CUT;
+    request.targets = 0x12; /* center and south */
+    request.length = 4;
+    node_ota_put_u32(request.data, 120);
+    CHECK(valid_request(&request));
+    request.targets = 0x16;
+    CHECK(!valid_request(&request));
+    request.targets = 0x10;
+    CHECK(!valid_request(&request));
+    request.targets = 0x02;
+    CHECK(!valid_request(&request));
+    request.targets = 0x12;
+    node_ota_put_u32(request.data, 301);
+    CHECK(!valid_request(&request));
+    node_ota_put_u32(request.data, 0);
+    CHECK(valid_request(&request));
+    node_ota_put_u32(request.data, 120);
+    request.length = 3;
+    CHECK(!valid_request(&request));
+    request.length = 4;
+    request.sender = NODE_OTA_CENTER;
+    CHECK(!valid_request(&request));
+    request.sender = NODE_OTA_HOST;
+    role = 1;
+    node_ota_register_radio_cut(mock_radio_cut);
+    cut_calls = 0;
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 1 && cut_seconds == 120);
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 1);
+    CHECK(!maintenance && receiver.phase == NODE_OTA_IDLE && !test_boot_quiet);
+    ++request.sequence;
+    set_maintenance(true, 456);
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_ERR_INVALID_STATE && cut_calls == 1);
+    set_maintenance(false, 0);
+    node_ota_put_u32(request.data, 0);
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 2 && cut_seconds == 0);
+    return 0;
+}

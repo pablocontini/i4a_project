@@ -4,9 +4,34 @@
 
 #include "os/os.h"
 #include "routing/impl.h"
+#include "../utils.h"
+
+bool rt_fwd_default_missing(routing_t *self) {
+    bool missing = false;
+    WITH_LOCK(&self->node_state.m_lock, {
+        missing = self->node_state.routing_table.default_gateway == 0;
+    });
+    return missing;
+}
+
+void rt_fwd_request_own_gateway(routing_t *self) {
+    rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
+    /* Reuse the path-checked request/retry protocol instead of accepting a
+     * longer bare DTR advertisement that could still depend on this node. */
+    rt_sibl_send_new_gateway_request_t request = {0};
+    self->role.impl.on_sibl_send_new_gateway_request(self, &request);
+}
 
 static void on_tick(routing_t *self, uint32_t dt_ms) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (state->global_state == GLOBAL_STATE_WITH_NETWORK && state->dtr > 1 &&
+        state->local_state == LOCAL_STATE_CONNECTED && rt_fwd_default_missing(self)) {
+        /* Shared-table loss is visible even when the sibling control packet
+         * was lost. Start once; later ticks use the normal retry deadline. */
+        rt_fwd_request_own_gateway(self);
+        return;
+    }
     if (state->provision_retry_timeout && state->is_local_root &&
         state->global_state == GLOBAL_STATE_WITH_NETWORK &&
         state->local_state == LOCAL_STATE_CONNECTED) {

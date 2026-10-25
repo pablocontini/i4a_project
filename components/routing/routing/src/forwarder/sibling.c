@@ -7,6 +7,7 @@
 
 static void on_update_dtr(routing_t *self, const rt_sibl_update_dtr_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
 
     uint32_t peer_dtr = event->dtr;
     if (peer_dtr == 0) {
@@ -34,7 +35,7 @@ static void on_update_dtr(routing_t *self, const rt_sibl_update_dtr_t *event) {
 static void on_provision(routing_t *self, const rt_sibl_provision_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
 
-    if (state->global_state == GLOBAL_STATE_WITH_NETWORK) {
+    if (node_network_is_valid(&state->node_network, self->orientation)) {
         log_info(TAG, "[on_provision] Device already provisioned -- skipping new provision");
         return;
     }
@@ -59,12 +60,14 @@ static void on_provision(routing_t *self, const rt_sibl_provision_t *event) {
 
 static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_gateway_request_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
 
     if (state->dtr == 1)
         return;  // I am root
 
-    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST)
-        return;  // We've already sent it
+    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST &&
+        state->gateway_request_timeout != 0)
+        return;  // An outstanding request already has a retry deadline.
 
     if (state->local_state == LOCAL_STATE_NOT_CONNECTED)
         return;  // We don't have a connection to a peer
@@ -95,6 +98,7 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
 
 static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_winner_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
 
     if (state->dtr == 1) {  // I'm root
         rt_peer_event_t peer_event = {

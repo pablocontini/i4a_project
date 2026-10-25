@@ -46,7 +46,8 @@ def main():
                  "test_boot_recovery_without_ring_and_no_restart_loop",
                  "test_boot_failure_keeps_rollback_deadline",
                  "test_boot_barrier_waits_for_every_confirmed_board",
-                 "test_boot_resume_cannot_be_injected_from_uart"):
+                 "test_boot_resume_cannot_be_injected_from_uart",
+                 "test_radio_cut_validation_retry_and_maintenance"):
         test = getattr(native, name)
         test.restype = ctypes.c_int
         line = test()

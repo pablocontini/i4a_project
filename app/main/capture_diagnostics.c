@@ -15,6 +15,7 @@
 #include "node.h"
 #include "spi.h"
 #include "ring_link.h"
+#include "neighbor_manager/neighbor_manager.h"
 
 /* Never retain routing locks while using UART or calling a driver. Bounded
  * reads report contention instead of blocking the control plane for capture. */
@@ -114,10 +115,19 @@ static void snapshot(routing_t *rt) {
 static void identity(routing_t *rt) {
     const esp_app_desc_t *app = esp_app_get_description();
     char hash[65];
+    nm_registry_t neighbors;
+    bool neighbors_ok = nm_copy_snapshot(&neighbors);
     for (unsigned i = 0; i < 32; ++i) snprintf(hash + i * 2, 3, "%02x", app->app_elf_sha256[i]);
     flockfile(stdout);
     printf("\nI4ACAP t_ms=%lld board=%u event=identity uuid=%s version=%s elf_sha256=%s reset=%d period_ms=2000\n",
            (long long)(esp_timer_get_time() / 1000), rt->orientation, node_get_uuid(), app->version, hash, esp_reset_reason());
+    if (neighbors_ok) for (unsigned i = 0; i < NM_RADIOS; ++i) {
+        const nm_claim_t *claim = &neighbors.claims[i];
+        printf("I4ACAP t_ms=%lld board=%u event=neighbor output=%u phase=%u peer=%s station=%u ap=%u\n",
+            (long long)(esp_timer_get_time() / 1000), rt->orientation, i + 1,
+            claim->phase, claim->phase ? claim->peer_uuid : "none",
+            claim->link.station_orientation, claim->link.ap_orientation);
+    }
     fflush(stdout);
     funlockfile(stdout);
 }

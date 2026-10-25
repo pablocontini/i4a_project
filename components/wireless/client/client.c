@@ -136,3 +136,11 @@ void client_close(void) {
 bool client_send_message(const uint8_t *msg, uint16_t len) {
     return session_initialized && peer_session_send(&session, msg, len);
 }
+
+bool client_is_peer_admitted(void) {
+    return sta_is_up && session_initialized && session.admitted && !session.stopping;
+}
+
+bool client_check_peer_network(uint32_t network, uint32_t mask) {
+    return session_initialized && peer_session_check_peer_network(&session, network, mask);
+}

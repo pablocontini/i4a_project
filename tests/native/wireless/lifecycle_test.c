@@ -19,6 +19,8 @@ static unsigned cancel_scan, lock_scan;
 static bool finish_on_wait, cancel_on_delay;
 static unsigned ap_associations;
 static esp_err_t ap_list_result;
+static esp_err_t nvs_init_result;
+static unsigned nvs_inits, nvs_erases;
 
 const char *esp_err_to_name(esp_err_t result) { (void)result; return "mock error"; }
 void wireless_log(const char *tag, const char *format, ...) { (void)tag; (void)format; }
@@ -78,8 +80,8 @@ esp_err_t esp_wifi_ap_get_sta_list(wifi_sta_list_t *list) {
 }
 esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t *record) { (void)record; return ESP_FAIL; }
 esp_err_t esp_wifi_set_max_tx_power(int8_t power) { (void)power; return ESP_OK; }
-esp_err_t nvs_flash_init(void) { return ESP_OK; }
-esp_err_t nvs_flash_erase(void) { return ESP_OK; }
+esp_err_t nvs_flash_init(void) { ++nvs_inits; return nvs_init_result; }
+esp_err_t nvs_flash_erase(void) { ++nvs_erases; return ESP_OK; }
 int tcpip_callback_wait(void (*callback)(void *), void *arg) { callback(arg); return ERR_OK; }
 void node_traffic_start(esp_netif_t *value) { (void)value; }
 void node_traffic_stop(esp_netif_t *value) { (void)value; }
@@ -261,6 +263,18 @@ static int test_ap_search_preserves_provisional_associations(void) {
   return 0;
 }
 
+static int test_nvs_initialization_failure_cannot_erase_block_ownership(void) {
+  const esp_err_t failures[]={ESP_ERR_NVS_NO_FREE_PAGES,ESP_ERR_NVS_NEW_VERSION_FOUND,ESP_FAIL};
+  for (unsigned i=0;i<sizeof(failures)/sizeof(failures[0]);++i) {
+    nvs_init_result=failures[i]; nvs_inits=nvs_erases=0;
+    CHECK(device_wifi_init()==failures[i]);
+    CHECK(nvs_inits==1 && !nvs_erases);
+  }
+  nvs_init_result=ESP_OK;
+  CHECK(device_wifi_init()==ESP_OK && !nvs_erases);
+  return 0;
+}
+
 int main(void) {
   int result;
 #define RUN(test) do { result = test(); if (result) { \
@@ -272,5 +286,6 @@ int main(void) {
   RUN(test_stop_waits_for_worker_instead_of_deleting_it);
   RUN(test_unconfigured_or_stopped_wifi_cannot_capture_internet);
   RUN(test_ap_search_preserves_provisional_associations);
+  RUN(test_nvs_initialization_failure_cannot_erase_block_ownership);
   return 0;
 }

@@ -105,3 +105,12 @@ void server_close(void) {
 bool server_send_message(const uint8_t *msg, uint16_t len) {
     return session_initialized && peer_session_send(&session, msg, len);
 }
+
+bool server_get_provision_offer(uint32_t *network, uint32_t *mask) {
+    *network = *mask = 0;
+    return session_initialized && peer_session_provision_offer(&session, network, mask);
+}
+
+bool server_check_peer_network(uint32_t network, uint32_t mask) {
+    return session_initialized && peer_session_check_peer_network(&session, network, mask);
+}

@@ -64,6 +64,9 @@ void wl_register_peer_callbacks(wireless_t *wl, wireless_callbacks_t callbacks, 
  * Returns true on success, false in case of error (usually, peer lost).
  */
 bool wl_send_peer_message(wireless_t *wl, const void *msg, uint16_t len);
+/* AP's durable logical allocation; it may differ from its physical subnet. */
+bool wl_get_provision_offer(wireless_t *wl, uint32_t *network, uint32_t *mask);
+bool wl_check_peer_network(wireless_t *wl, uint32_t network, uint32_t mask);
 
 /**
  * Informs the wireless subsystem that this device can provide Internet

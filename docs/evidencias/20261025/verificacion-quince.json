@@ -1,0 +1,87 @@
+{
+  "verified_utc": "2026-10-25T18:16:42.921194+00:00",
+  "normal_roles": 15,
+  "nodes": {
+    "root": {
+      "port": "COM5",
+      "verified": true,
+      "utc": "2026-10-25T18:16:39.942284+00:00",
+      "roles": {
+        "0": {
+          "status": "north: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000021004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "1": {
+          "status": "south: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000021004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "2": {
+          "status": "east: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000021004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "3": {
+          "status": "west: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000021004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "4": {
+          "status": "center: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000021004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        }
+      }
+    },
+    "grillo": {
+      "port": "COM7",
+      "verified": true,
+      "utc": "2026-10-25T18:16:42.919191+00:00",
+      "roles": {
+        "0": {
+          "status": "north: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000002004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "1": {
+          "status": "south: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000002004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "2": {
+          "status": "east: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000002004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "3": {
+          "status": "west: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000002004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        },
+        "4": {
+          "status": "center: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=4aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae97",
+          "data_hex": "000000000000001f00000002004aec92bb1bc1781973a70eb544af0455a840102fc2cffe80e6824843f1c9ae970000000000000100"
+        }
+      }
+    },
+    "ramona": {
+      "port": "COM8",
+      "verified": true,
+      "utc": "2026-10-25T18:16:39.987774+00:00",
+      "roles": {
+        "0": {
+          "status": "north: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+          "data_hex": "000000000000001f0000002100fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce030000000000000100"
+        },
+        "1": {
+          "status": "south: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+          "data_hex": "000000000000001f0000002100fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce030000000000000100"
+        },
+        "2": {
+          "status": "east: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+          "data_hex": "000000000000001f0000002100fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce030000000000000100"
+        },
+        "3": {
+          "status": "west: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+          "data_hex": "000000000000001f0000002100fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce030000000000000100"
+        },
+        "4": {
+          "status": "center: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce03",
+          "data_hex": "000000000000001f0000002100fe09b3f25e85e9bb98bcd46210722b6b0784dd41a079579452b3452c7e01ce030000000000000100"
+        }
+      }
+    }
+  }
+}

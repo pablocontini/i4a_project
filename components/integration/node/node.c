@@ -12,6 +12,9 @@
 #include "remote_control.h"
 #include "task_config.h"
 #include "node.h"
+#include "node_radio_cut.h"
+#include "server.h"
+#include "client.h"
 #include "config_portal/config_portal.h"
 #include "portal_settings/portal_settings.h"
 #include "wifi_credentials/wifi_credentials.h"
@@ -107,9 +110,10 @@ static void node_ap_sta_cycle_task(void *arg) {
     vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
   
     // Stay in STA while the STA condition is true
-    while (node_ptr->node_device_ptr->mode == STATION &&
-           node_ptr->node_device_ptr->station_ptr &&
-           node_ptr->node_device_ptr->station_ptr->is_fully_connected) {
+    while (node_radio_cut_busy() ||
+           (node_ptr->node_device_ptr->mode == STATION &&
+            node_ptr->node_device_ptr->station_ptr &&
+            node_ptr->node_device_ptr->station_ptr->is_fully_connected)) {
       vTaskDelay(pdMS_TO_TICKS(AP_STA_CYCLE_DELAY_MINUTES * 60 * 1000));
     }
   
@@ -176,6 +180,7 @@ void node_setup(void){
   node_ptr->node_device_is_center_root = rm_is_root();
   node_ptr->node_device_is_apsta = false;
   if (!orientation_mode_requested && !configuration_mode_requested) {
+    ESP_ERROR_CHECK(node_radio_cut_init(node_ptr->node_device_ptr));
     node_traffic_init();
     im_scheduler_start();
     if (node_ptr->node_device_orientation == NODE_DEVICE_ORIENTATION_CENTER &&
@@ -403,4 +408,17 @@ bool node_is_device_apsta(void) {
 
 bool node_is_network_provided(void){
   return (node_ptr->node_device_subnet != DEFAULT_SUBNET);
+}
+
+bool node_get_peer_provision_offer(uint32_t *network, uint32_t *mask) {
+    if (node_ptr->node_device_ptr->mode != AP) return false;
+    *network = *mask = 0;
+    (void)server_get_provision_offer(network, mask);
+    return true;
+}
+
+bool node_check_peer_network(uint32_t network, uint32_t mask) {
+    if (node_ptr->node_device_ptr->mode == AP) return server_check_peer_network(network, mask);
+    if (node_ptr->node_device_ptr->mode == STATION) return client_check_peer_network(network, mask);
+    return false;
 }
