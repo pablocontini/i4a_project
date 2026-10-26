@@ -34,6 +34,8 @@ def main():
                      "test_expiry_renewal_and_stale_sessions", "test_identity_validation",
                      "test_all_simultaneous_endpoint_orders"),
         "manager": ("test_spi_reservations_snapshots_and_release", "test_spi_loss_expiry_and_stale_cleanup",
+                    "test_root_guard_preserves_active_root_and_allows_other_neighbors",
+                    "test_root_guard_rejects_pending_admission_and_expires_in_real_time",
                     "test_spi_incoming_identity_and_invalid_owner",
                     "test_neighbor_callback_defers_broadcast_and_handles_full_queue",
                     "test_neighbor_worker_failure_and_idle_expiry",

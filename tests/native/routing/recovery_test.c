@@ -1033,3 +1033,51 @@ EXPORT int test_subnet_validation_rejects_invalid_provisions_before_mutation(voi
     CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_SOUTH);
     return 0;
 }
+
+static uint32_t diagnostic_clock(void) { return 123456; }
+EXPORT int test_gateway_trace_is_bounded_and_preserves_event_order(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    network_t path[2]={NETWORK(0x0A800000,0xFFE00000),NETWORK(0,0)};
+    rt_gw_trace(&self, RT_GW_REQUEST_TX, RT_GW_OK, 1, path, 2);
+    CHECK(self.gw_count==0);
+    self.gw_clock_ms=diagnostic_clock;
+    for (unsigned i=0; i<RT_GW_TRACE_CAPACITY+3; ++i)
+        rt_gw_trace(&self, RT_GW_REQUEST_TX, RT_GW_OK, i, path, 2);
+    CHECK(self.gw_count==RT_GW_TRACE_CAPACITY && self.gw_dropped==3);
+    rt_gw_trace_t records[4]; uint32_t dropped=0;
+    CHECK(rt_gw_trace_drain(&self,records,4,&dropped)==4);
+    CHECK(dropped==3 && records[0].time_ms==123456 && records[0].hops==1);
+    CHECK(records[0].sequence==1 && records[3].sequence==4);
+    CHECK(records[0].value==0 && records[3].value==3 && records[0].dtr==2);
+    CHECK(records[0].path_hash!=0 && records[0].path_hash==records[3].path_hash);
+    rt_gw_trace(&self,RT_GW_RETRY_TX,RT_GW_OK,99,NULL,0);
+    while (self.gw_count>1) {
+        size_t cap=self.gw_count>4?4:self.gw_count-1;
+        CHECK(rt_gw_trace_drain(&self,records,cap,&dropped)==cap);
+    }
+    CHECK(rt_gw_trace_drain(&self,records,4,&dropped)==1);
+    CHECK(records[0].sequence==36 && records[0].event==RT_GW_RETRY_TX);
+    CHECK(records[0].path_hash==0 && self.gw_count==0 && mutex_errors==0);
+    return 0;
+}
+
+EXPORT int test_gateway_trace_records_request_retry_and_winner_without_changing_deadlines(void) {
+    reset_capture(); routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    self.gw_clock_ms=diagnostic_clock;
+    rt_sibl_send_new_gateway_request_t request={0};
+    self.role.impl.on_sibl_send_new_gateway_request(&self,&request);
+    CHECK(self.role.state.forwarder.gateway_request_timeout==30000);
+    self.role.impl.on_tick(&self,30000);
+    rt_peer_new_gateway_response_t winner={.dtr=1};
+    self.role.impl.on_peer_new_gateway_response(&self,&winner);
+    rt_gw_trace_t r[4];uint32_t drops;
+    CHECK(rt_gw_trace_drain(&self,r,4,&drops)==3 && drops==0);
+    CHECK(r[0].event==RT_GW_REQUEST_TX && r[0].value==1 && r[0].timeout_ms==30000);
+    CHECK(r[1].event==RT_GW_RETRY_TX && r[1].path_hash==r[0].path_hash);
+    CHECK(r[2].event==RT_GW_DECISION && r[2].reason==RT_GW_ADOPT);
+    CHECK(r[2].timeout_ms==0 && self.role.state.forwarder.dtr==2 && peer_count==2);
+    return 0;
+}

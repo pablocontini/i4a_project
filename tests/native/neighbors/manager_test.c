@@ -151,6 +151,54 @@ static nm_link_id_t admitted_ap(unsigned ap, const char *peer, uint32_t token) {
     return link;
 }
 
+EXPORT int test_root_guard_preserves_active_root_and_allows_other_neighbors(void) {
+    reset();
+    nm_link_id_t root = new_link(2, 0, 71), lateral = new_link(3, 2, 72);
+    switch_to(2);
+    CHECK(nm_reserve("000000000000", &root) && nm_commit(&root) && nm_activate(&root));
+    for (int i = 0; i <= NM_CENTER; ++i) {
+        switch_to(i);
+        CHECK(nm_guard_root(60));
+        CHECK(nm_root_guard_remaining_ms() == 60000);
+    }
+    switch_to(2);
+    CHECK(nm_renew(&root) && nm_owns(&root));
+    CHECK(nm_is_blocked_uuid("000000000000"));
+    CHECK(!nm_is_blocked_uuid("B00000000000"));
+    switch_to(3);
+    CHECK(nm_reserve("B00000000000", &lateral) && nm_commit(&lateral) && nm_activate(&lateral));
+    switch_to(2); nm_release(&root);
+    CHECK(!nm_reserve("000000000000", &root));
+    for (int i = 0; i <= NM_CENTER; ++i) { switch_to(i); CHECK(nm_guard_root(0)); }
+    switch_to(2);
+    CHECK(!nm_root_guard_remaining_ms());
+    CHECK(nm_reserve("000000000000", &root));
+    CHECK(!nm_guard_root(901));
+    switch_to(NM_CENTER);
+    memcpy(manager.uuid, "000000000000", NM_UUID_LEN + 1);
+    CHECK(!nm_guard_root(60));
+    return 0;
+}
+
+EXPORT int test_root_guard_rejects_pending_admission_and_expires_in_real_time(void) {
+    reset();
+    nm_link_id_t root = new_link(0, 0, 73);
+    switch_to(0);
+    CHECK(nm_reserve("000000000000", &root));
+    /* Central guard defeats an in-flight candidate even if the radio missed its command. */
+    switch_to(NM_CENTER); CHECK(nm_guard_root(60));
+    switch_to(0); CHECK(!nm_commit(&root)); nm_release(&root);
+    CHECK(!nm_reserve("000000000000", &root));
+    switch_to(NM_CENTER);
+    paused = true; pause_started = clock_ms;
+    clock_ms += 60000;
+    CHECK(!nm_root_guard_remaining_ms());
+    paused_total += clock_ms - pause_started; paused = false;
+    switch_to(0);
+    CHECK(nm_reserve("000000000000", &root) && nm_commit(&root));
+    return 0;
+}
+
 EXPORT int test_block_rpc_serializes_radios_and_preserves_uuid_after_release(void) {
     reset();
     nm_network_t root={0x0A000000,0xFF000000}, empty={0}, grillo, other, moved;

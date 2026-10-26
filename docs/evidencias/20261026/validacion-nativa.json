@@ -1,0 +1,14 @@
+{
+  "native_routing": 36,
+  "native_neighbors": 38,
+  "native_ota": 24,
+  "native_wireless": 7,
+  "native_routing_hooks": 5,
+  "total": 110,
+  "compiler": "app/build/tools/tcc/tcc.exe",
+  "result": "passed",
+  "test_sources": {
+    "tests/native/routing/recovery_test.c": "0f6fe771d8427e79ca89b861d59ede92136a8b8c934dc895f3f93062b032ac8f",
+    "tests/run_native_routing.py": "9f84ea49c98fce0e7b610352253964f22ee14ee63cc4e8be77d218cd12a116b6"
+  }
+}

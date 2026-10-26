@@ -44,6 +44,24 @@ class CutLinkTest(unittest.TestCase):
         updater.command.assert_not_called()
         transport.close.assert_called_once()
 
+    def test_guard_clears_after_cut_before_remaining_observation(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(cut_link, 'require_root_guard'), patch.object(cut_link, 'observe') as observe:
+            result, updater, _ = self.run_cli(['--seconds', '60', '--watch', '100',
+                '--record-output', str(Path(tmp)/'control'), '--require-root-guard', tmp])
+            self.assertEqual(result, 0)
+            self.assertEqual([c.args for c in updater.command.call_args_list],
+                             [(9, struct.pack('<I', 60)), (10, b'\0'*4)])
+            self.assertEqual([c.args[1] for c in observe.call_args_list], [0, 75, 25])
+
+    def test_guard_precondition_failure_prevents_cut_and_clears_guard(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(cut_link, 'observe'), \
+             patch.object(cut_link, 'require_root_guard', side_effect=cut_link.UpdateError('stale')):
+            result, updater, _ = self.run_cli(['--seconds', '60', '--watch', '100',
+                '--record-output', str(Path(tmp)/'control'), '--require-root-guard', tmp])
+            self.assertEqual(result, 1)
+            updater.command.assert_called_once_with(10, b'\0'*4)
+
     def test_recording_preserves_rx_bytes_lines_and_tx(self):
         from unittest.mock import Mock
         with tempfile.TemporaryDirectory() as directory:

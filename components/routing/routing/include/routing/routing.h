@@ -18,6 +18,14 @@ extern "C" {
 #include "routing/routing_table.h"
 #include "routing/types.h"
 
+#define RT_GW_TRACE_CAPACITY 32
+/* Local observation IDs, not wire transaction IDs. No protocol change. */
+typedef struct rt_gw_trace {
+    uint32_t time_ms, sequence, dtr, timeout_ms, value, path_hash;
+    uint16_t event, reason;
+    uint8_t hops, state;
+} rt_gw_trace_t;
+
 typedef struct routing {
     /**
      * Module dependencies
@@ -62,7 +70,24 @@ typedef struct routing {
      * Private internal device state and role definition.
      */
     rt_role_t role;
+    /* Optional bounded recorder; producers never print or allocate. */
+    uint32_t (*gw_clock_ms)(void);
+    rt_gw_trace_t gw_trace[RT_GW_TRACE_CAPACITY];
+    uint32_t gw_sequence, gw_dropped;
+    unsigned gw_head, gw_count;
 } routing_t;
+
+enum { RT_GW_RX_PEER=1, RT_GW_RX_SIBLING, RT_GW_REQUEST_TX,
+       RT_GW_RETRY_TX, RT_GW_RESPONSE_TX, RT_GW_ROOT_WAIT,
+       RT_GW_ROOT_RESPONSE, RT_GW_DECISION, RT_GW_HANDSHAKE_TX };
+enum { RT_GW_OK=0, RT_GW_NO_NETWORK, RT_GW_BAD_NETWORK,
+       RT_GW_UNREACHABLE, RT_GW_PENDING, RT_GW_LOOP,
+       RT_GW_PATH_FULL, RT_GW_NOT_CONNECTED, RT_GW_NOT_BETTER,
+       RT_GW_ADOPT, RT_GW_FORWARD, RT_GW_ALREADY_PENDING };
+void rt_gw_trace(routing_t *self, unsigned event, unsigned reason,
+                 uint32_t value, const network_t *path, size_t count);
+size_t rt_gw_trace_drain(routing_t *self, rt_gw_trace_t *out, size_t capacity,
+                         uint32_t *dropped);
 
 /**
  * Initializes the routing module and binds required dependencies.

@@ -66,11 +66,15 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
         return;  // I am root
 
     if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST &&
-        state->gateway_request_timeout != 0)
-        return;  // An outstanding request already has a retry deadline.
+        state->gateway_request_timeout != 0) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_PENDING, 0, event->hag_networks, 16);
+        return;
+    }  // An outstanding request already has a retry deadline.
 
-    if (state->local_state == LOCAL_STATE_NOT_CONNECTED)
-        return;  // We don't have a connection to a peer
+    if (state->local_state == LOCAL_STATE_NOT_CONNECTED) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_NOT_CONNECTED, 0, event->hag_networks, 16);
+        return;
+    }  // We don't have a connection to a peer
 
     rt_peer_event_t peer_event = { .event_id = PEER_NEW_GATEWAY_REQUEST };
     memcpy(peer_event.payload.new_gateway_request.hag_networks, event->hag_networks, sizeof(event->hag_networks));
@@ -81,6 +85,7 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
     );
 
     if (!hag_network) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_PATH_FULL, 0, event->hag_networks, 16);
         log_error(TAG, "[on_send_gw_req] Too many networks in message -- dropping");
         return;
     }
@@ -93,7 +98,9 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
            sizeof(state->gateway_request_path));
     state->gateway_request_timeout = GATEWAY_REQUEST_RETRY_MS;
 
-    wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    rt_gw_trace(self, RT_GW_REQUEST_TX, RT_GW_OK, sent,
+        peer_event.payload.new_gateway_request.hag_networks, 16);
 }
 
 static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_winner_t *event) {
@@ -109,7 +116,8 @@ static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_win
             },
         };
 
-        wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+        bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+        rt_gw_trace(self, RT_GW_RESPONSE_TX, RT_GW_OK, sent, NULL, 0);
         return;
     }
 
@@ -127,7 +135,8 @@ static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_win
             },
         };
 
-    wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    rt_gw_trace(self, RT_GW_RESPONSE_TX, RT_GW_OK, sent, NULL, 0);
 }
 
 void rt_fwd_sibl_set_required_callbacks(rt_role_impl_t *impl) {

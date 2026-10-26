@@ -1,0 +1,41 @@
+{
+  "root": {
+    "port": "COM8",
+    "expected_elf": "57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+    "verified": true,
+    "stopped_utc": "2026-10-26T03:37:56.169+00:00",
+    "after": {
+      "0": "north: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "1": "south: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "2": "east: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "3": "west: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "4": "center: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc"
+    }
+  },
+  "grillo": {
+    "port": "COM5",
+    "expected_elf": "57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+    "verified": true,
+    "stopped_utc": "2026-10-26T03:37:55.585+00:00",
+    "after": {
+      "0": "north: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "1": "south: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "2": "east: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "3": "west: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+      "4": "center: phase=0, slot=2031616, running=0x210000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc"
+    }
+  },
+  "ramona": {
+    "port": "COM9",
+    "expected_elf": "d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+    "verified": true,
+    "stopped_utc": "2026-10-26T03:37:56.714+00:00",
+    "after": {
+      "0": "north: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+      "1": "south: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+      "2": "east: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+      "3": "west: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+      "4": "center: phase=0, slot=2031616, running=0x20000, pending_verify=0, recovery_pending=0, ready=1, boot_paused=0, session=0, elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58"
+    }
+  }
+}

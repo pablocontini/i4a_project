@@ -12,6 +12,49 @@
 #include "sync/sync.h"
 #include "wireless/wireless.h"
 
+void rt_gw_trace(routing_t *self, unsigned event, unsigned reason,
+                 uint32_t value, const network_t *path, size_t count) {
+    if (!self->gw_clock_ms) return;
+    rt_gw_trace_t record = { .time_ms=self->gw_clock_ms(),
+        .event=event, .reason=reason, .value=value };
+    if (self->orientation != ORIENTATION_CENTER) {
+        record.dtr=self->role.state.forwarder.dtr;
+        record.timeout_ms=self->role.state.forwarder.gateway_request_timeout;
+        record.state=self->role.state.forwarder.global_state;
+    } else {
+        record.timeout_ms=self->role.state.root.gateway_requested_timeout;
+    }
+    if (path) {
+        record.path_hash=2166136261U;
+        for (size_t i=0; i<count && path[i].addr; ++i) {
+            ++record.hops;
+            record.path_hash=(record.path_hash ^ path[i].addr)*16777619U;
+            record.path_hash=(record.path_hash ^ path[i].mask)*16777619U;
+        }
+    }
+    WITH_LOCK(&self->queue_lock, {
+        record.sequence=++self->gw_sequence;
+        if (self->gw_count < RT_GW_TRACE_CAPACITY) {
+            self->gw_trace[(self->gw_head+self->gw_count)%RT_GW_TRACE_CAPACITY]=record;
+            ++self->gw_count;
+        } else ++self->gw_dropped;
+    });
+}
+
+size_t rt_gw_trace_drain(routing_t *self, rt_gw_trace_t *out, size_t capacity,
+                         uint32_t *dropped) {
+    size_t n=0;
+    WITH_LOCK(&self->queue_lock, {
+        while (n<capacity && self->gw_count) {
+            out[n++]=self->gw_trace[self->gw_head];
+            self->gw_head=(self->gw_head+1)%RT_GW_TRACE_CAPACITY;
+            --self->gw_count;
+        }
+        *dropped=self->gw_dropped;
+    });
+    return n;
+}
+
 #define NODE_STARTUP_DELAY_SECONDS 10
 #define ROUTING_TAG "routing"
 
@@ -78,6 +121,9 @@ static void on_critical_section(void *ctx) {
                     internal_queue->count * sizeof(event));
         });
         const rt_sibl_event_t *ev = &event;
+        rt_gw_trace(self, RT_GW_RX_SIBLING, RT_GW_OK, ev->event_id,
+            ev->event_id==SIBL_SEND_NEW_GATEWAY_REQUEST ? ev->payload.send_new_gateway_request.hag_networks : NULL,
+            ev->event_id==SIBL_SEND_NEW_GATEWAY_REQUEST ? 16 : 0);
         switch (ev->event_id) {
             case SIBL_ON_START:
                 if (self->role.impl.on_start)
@@ -116,6 +162,9 @@ static void on_critical_section(void *ctx) {
                     external_queue->count * sizeof(event));
         });
         const rt_peer_event_t *ev = &event;
+        rt_gw_trace(self, RT_GW_RX_PEER, RT_GW_OK, ev->event_id,
+            ev->event_id==PEER_NEW_GATEWAY_REQUEST ? ev->payload.new_gateway_request.hag_networks : NULL,
+            ev->event_id==PEER_NEW_GATEWAY_REQUEST ? 16 : 0);
         switch (ev->event_id) {
             case PEER_HANDSHAKE:
                 if (self->role.impl.on_peer_handshake)

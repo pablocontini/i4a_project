@@ -1,0 +1,290 @@
+{
+  "cut_events": [],
+  "routes": {
+    "grillo_center": [
+      {
+        "utc": "2026-10-26T03:19:36.458+00:00",
+        "route": "available=1 default=1 count=2 rpi_out=1 internet_out=1 entries=0a6e8000/ffff8000:5,0a000000/ff000000:1"
+      },
+      {
+        "utc": "2026-10-26T03:20:07.552+00:00",
+        "route": "available=1 default=0 count=1 rpi_out=0 internet_out=0 entries=0a6e8000/ffff8000:5"
+      },
+      {
+        "utc": "2026-10-26T03:22:38.344+00:00",
+        "route": "available=1 default=0 count=2 rpi_out=0 internet_out=0 entries=0a6e8000/ffff8000:5,0a600000/ffe00000:3"
+      },
+      {
+        "utc": "2026-10-26T03:22:52.835+00:00",
+        "route": "available=1 default=3 count=2 rpi_out=3 internet_out=3 entries=0a6e8000/ffff8000:5,0a600000/ffe00000:3"
+      }
+    ],
+    "grillo_east": [
+      {
+        "utc": "2026-10-26T03:19:16.902+00:00",
+        "route": "available=1 default=1 count=2 rpi_out=1 internet_out=1 entries=0a6e8000/ffff8000:5,0a000000/ff000000:1"
+      },
+      {
+        "utc": "2026-10-26T03:20:08.741+00:00",
+        "route": "available=1 default=0 count=1 rpi_out=0 internet_out=0 entries=0a6e8000/ffff8000:5"
+      },
+      {
+        "utc": "2026-10-26T03:22:37.500+00:00",
+        "route": "available=1 default=0 count=2 rpi_out=0 internet_out=0 entries=0a6e8000/ffff8000:5,0a600000/ffe00000:3"
+      },
+      {
+        "utc": "2026-10-26T03:22:51.995+00:00",
+        "route": "available=1 default=3 count=2 rpi_out=3 internet_out=3 entries=0a6e8000/ffff8000:5,0a600000/ffe00000:3"
+      }
+    ],
+    "root_center": [
+      {
+        "utc": "2026-10-26T03:19:17.205+00:00",
+        "route": "available=1 default=5 count=1 rpi_out=5 internet_out=5 entries=0a6c0000/fffc0000:2"
+      },
+      {
+        "utc": "2026-10-26T03:20:08.807+00:00",
+        "route": "available=1 default=5 count=0 rpi_out=5 internet_out=5 entries="
+      },
+      {
+        "utc": "2026-10-26T03:21:51.973+00:00",
+        "route": "available=1 default=5 count=1 rpi_out=5 internet_out=5 entries=0a600000/ffe00000:2"
+      },
+      {
+        "utc": "2026-10-26T03:22:04.340+00:00",
+        "route": "available=1 default=5 count=0 rpi_out=5 internet_out=5 entries="
+      },
+      {
+        "utc": "2026-10-26T03:22:20.872+00:00",
+        "route": "available=1 default=5 count=1 rpi_out=5 internet_out=5 entries=0a600000/ffe00000:2"
+      },
+      {
+        "utc": "2026-10-26T03:22:37.427+00:00",
+        "route": "available=1 default=5 count=2 rpi_out=5 internet_out=5 entries=0a6c0000/fffc0000:2,0a600000/ffe00000:2"
+      }
+    ],
+    "ramona_east": [
+      {
+        "utc": "2026-10-26T03:21:39.005+00:00",
+        "route": "available=1 default=5 count=0 rpi_out=5 internet_out=5 entries="
+      },
+      {
+        "utc": "2026-10-26T03:21:51.374+00:00",
+        "route": "available=1 default=1 count=0 rpi_out=1 internet_out=1 entries="
+      },
+      {
+        "utc": "2026-10-26T03:22:01.675+00:00",
+        "route": "available=1 default=1 count=1 rpi_out=1 internet_out=1 entries=0a740000/fffc0000:5"
+      },
+      {
+        "utc": "2026-10-26T03:22:07.925+00:00",
+        "route": "available=1 default=0 count=1 rpi_out=0 internet_out=0 entries=0a740000/fffc0000:5"
+      },
+      {
+        "utc": "2026-10-26T03:22:20.296+00:00",
+        "route": "available=1 default=1 count=2 rpi_out=1 internet_out=1 entries=0a740000/fffc0000:5,0a000000/ff000000:1"
+      },
+      {
+        "utc": "2026-10-26T03:22:38.933+00:00",
+        "route": "available=1 default=1 count=3 rpi_out=1 internet_out=1 entries=0a740000/fffc0000:5,0a6c0000/fffc0000:3,0a000000/ff000000:1"
+      }
+    ]
+  },
+  "pings": {
+    "gateway": {
+      "sent": 496,
+      "received": 496,
+      "lost": 0,
+      "outages": [],
+      "recovery_after_cut_s": null,
+      "recovered_before_radio_restored": null,
+      "last_five_received": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "bindings": [
+        [
+          "Wi-Fi 3",
+          "10.110.128.2"
+        ]
+      ]
+    },
+    "rpi": {
+      "sent": 407,
+      "received": 317,
+      "lost": 90,
+      "outages": [
+        {
+          "first_failure_utc": "2026-10-26T03:20:08.341+00:00",
+          "next_reply_utc": "2026-10-26T03:22:52.506+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:20:05.527+00:00",
+          "failure_to_reply_s": 164.165
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:24:15.835+00:00",
+          "next_reply_utc": "2026-10-26T03:24:15.967+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:24:13.034+00:00",
+          "failure_to_reply_s": 0.132
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:24:29.836+00:00",
+          "next_reply_utc": "2026-10-26T03:24:29.949+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:24:27.065+00:00",
+          "failure_to_reply_s": 0.113
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:25:30.836+00:00",
+          "next_reply_utc": "2026-10-26T03:25:30.963+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:25:28.318+00:00",
+          "failure_to_reply_s": 0.127
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:25:48.847+00:00",
+          "next_reply_utc": "2026-10-26T03:25:48.947+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:25:46.138+00:00",
+          "failure_to_reply_s": 0.1
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:26:49.847+00:00",
+          "next_reply_utc": "2026-10-26T03:26:49.946+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:26:47.167+00:00",
+          "failure_to_reply_s": 0.099
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:27:03.844+00:00",
+          "next_reply_utc": "2026-10-26T03:27:03.944+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:27:00.977+00:00",
+          "failure_to_reply_s": 0.1
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:27:07.842+00:00",
+          "next_reply_utc": "2026-10-26T03:27:07.948+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:27:04.976+00:00",
+          "failure_to_reply_s": 0.106
+        }
+      ],
+      "recovery_after_cut_s": 166.484,
+      "recovered_before_radio_restored": null,
+      "last_five_received": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "bindings": [
+        [
+          "Wi-Fi 3",
+          "10.110.128.2"
+        ]
+      ]
+    },
+    "internet": {
+      "sent": 410,
+      "received": 324,
+      "lost": 86,
+      "outages": [
+        {
+          "first_failure_utc": "2026-10-26T03:19:47.346+00:00",
+          "next_reply_utc": "2026-10-26T03:19:47.470+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:19:44.658+00:00",
+          "failure_to_reply_s": 0.124
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:20:08.341+00:00",
+          "next_reply_utc": "2026-10-26T03:22:52.507+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:20:05.573+00:00",
+          "failure_to_reply_s": 164.166
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:23:13.340+00:00",
+          "next_reply_utc": "2026-10-26T03:23:13.474+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:23:10.657+00:00",
+          "failure_to_reply_s": 0.134
+        },
+        {
+          "first_failure_utc": "2026-10-26T03:24:59.844+00:00",
+          "next_reply_utc": "2026-10-26T03:24:59.977+00:00",
+          "last_prior_reply_utc": "2026-10-26T03:24:57.211+00:00",
+          "failure_to_reply_s": 0.133
+        }
+      ],
+      "recovery_after_cut_s": 166.485,
+      "recovered_before_radio_restored": null,
+      "last_five_received": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "bindings": [
+        [
+          "Wi-Fi 3",
+          "10.110.128.2"
+        ]
+      ]
+    }
+  },
+  "uarts": {
+    "grillo_center": {
+      "lines": 1882,
+      "first_utc": "2026-10-26T03:19:36.437+00:00",
+      "last_utc": "2026-10-26T03:27:06.542+00:00",
+      "uptime_regressions": [],
+      "first_identity": {
+        "utc": "2026-10-26T03:19:57.159+00:00",
+        "text": "I4ACAP t_ms=2450293 board=5 event=identity uuid=142B2FC05E7D version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      },
+      "last_identity": {
+        "utc": "2026-10-26T03:26:40.633+00:00",
+        "text": "I4ACAP t_ms=2853774 board=5 event=identity uuid=142B2FC05E7D version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      }
+    },
+    "grillo_east": {
+      "lines": 2018,
+      "first_utc": "2026-10-26T03:19:16.891+00:00",
+      "last_utc": "2026-10-26T03:27:27.694+00:00",
+      "uptime_regressions": [],
+      "first_identity": {
+        "utc": "2026-10-26T03:19:29.324+00:00",
+        "text": "I4ACAP t_ms=2411883 board=3 event=identity uuid=142B2FC05E7D version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      },
+      "last_identity": {
+        "utc": "2026-10-26T03:27:15.171+00:00",
+        "text": "I4ACAP t_ms=2877723 board=3 event=identity uuid=142B2FC05E7D version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      }
+    },
+    "root_center": {
+      "lines": 2007,
+      "first_utc": "2026-10-26T03:19:17.198+00:00",
+      "last_utc": "2026-10-26T03:27:26.871+00:00",
+      "uptime_regressions": [],
+      "first_identity": {
+        "utc": "2026-10-26T03:19:31.634+00:00",
+        "text": "I4ACAP t_ms=1860443 board=5 event=identity uuid=000000000000 version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      },
+      "last_identity": {
+        "utc": "2026-10-26T03:27:16.447+00:00",
+        "text": "I4ACAP t_ms=2325243 board=5 event=identity uuid=000000000000 version=9738908-dirty elf_sha256=57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc reset=3 period_ms=2000"
+      }
+    },
+    "ramona_east": {
+      "lines": 1442,
+      "first_utc": "2026-10-26T03:21:20.526+00:00",
+      "last_utc": "2026-10-26T03:27:28.486+00:00",
+      "uptime_regressions": [],
+      "first_identity": {
+        "utc": "2026-10-26T03:22:03.726+00:00",
+        "text": "I4ACAP t_ms=61283 board=3 event=identity uuid=20E7C85AA245 version=9738908-dirty elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58 reset=1 period_ms=2000"
+      },
+      "last_identity": {
+        "utc": "2026-10-26T03:27:13.907+00:00",
+        "text": "I4ACAP t_ms=371453 board=3 event=identity uuid=20E7C85AA245 version=9738908-dirty elf_sha256=d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58 reset=1 period_ms=2000"
+      }
+    }
+  }
+}

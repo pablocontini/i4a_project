@@ -46,6 +46,7 @@ static void on_new_gateway_request(routing_t *self, const rt_sibl_send_new_gatew
 
     state->gateway_requested = true;
     state->gateway_requested_timeout = GATEWAY_REQUEST_TIMEOUT;
+    rt_gw_trace(self, RT_GW_ROOT_WAIT, RT_GW_OK, GATEWAY_REQUEST_TIMEOUT, NULL, 0);
 }
 
 static void on_tick(routing_t *self, uint32_t dt_ms) {
@@ -73,7 +74,9 @@ static void on_tick(routing_t *self, uint32_t dt_ms) {
                 .dtr = 1,
             },
         };
-        if (!rs_broadcast(self->deps.rs, RS_ROUTING, &event, sizeof(event))) {
+        bool sent=rs_broadcast(self->deps.rs, RS_ROUTING, &event, sizeof(event));
+        rt_gw_trace(self, RT_GW_ROOT_RESPONSE, RT_GW_OK, sent, NULL, 0);
+        if (!sent) {
             state->gateway_requested = true;
             state->gateway_requested_timeout = ROOT_CONTROL_RETRY_MS;
         }

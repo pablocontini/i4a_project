@@ -1,0 +1,10 @@
+{
+  "built_utc": "2026-10-26T02:31:01.989653+00:00",
+  "variant": "ramona",
+  "ssid": "ComNetAR - Ramona",
+  "diagnostics": true,
+  "main_bin_sha256": "be81cbf9624e6f297de0445f98a227102591ee48e89da0c64a8eb144dffac08c",
+  "size": 907152,
+  "elf_sha256_reported_by_firmware": "d033c9e5254dc0b5edfcd8bd762773f20a0820cda2641327f792f857d82c1e58",
+  "sources_zip_sha256": "6bb10a5a91f423de500735b8f5dca844312d673178c4d28a2f9a5e4d06b201e2"
+}

@@ -1,0 +1,6 @@
+{
+  "command": "python -m unittest discover -s tests -p 'test_*.py'",
+  "tests": 75,
+  "result": "OK",
+  "verified_utc": "2026-10-26T03:38:23.849049+00:00"
+}

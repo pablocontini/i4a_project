@@ -57,7 +57,9 @@ static void on_tick(routing_t *self, uint32_t dt_ms) {
     memcpy(retry.payload.new_gateway_request.hag_networks,
            state->gateway_request_path, sizeof(state->gateway_request_path));
     state->gateway_request_timeout = GATEWAY_REQUEST_RETRY_MS;
-    wl_send_peer_message(self->deps.wl, &retry, sizeof(retry));
+    bool sent=wl_send_peer_message(self->deps.wl, &retry, sizeof(retry));
+    rt_gw_trace(self, RT_GW_RETRY_TX, RT_GW_OK, sent,
+        retry.payload.new_gateway_request.hag_networks, 16);
 }
 
 bool create_forwarder_core(routing_t *self) {

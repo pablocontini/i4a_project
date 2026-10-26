@@ -1,0 +1,15 @@
+{
+  "archive": "gateway-diag-20261025-233002-evidencia.zip",
+  "bytes": 13495718,
+  "sha256": "06ab056bb47ce3fd1b2feaf671e0112763dbc559a30f208444bbdeb415503bde",
+  "state": "completed_late_ramona_recovery_with_gateway_trace",
+  "root_guard_cleared": true,
+  "explicit_north_restore_acknowledged": true,
+  "direct_north_uart": false,
+  "gateway_round_trip_device_ms": 14864,
+  "root_wait_and_publish_device_ms": 9075,
+  "radio_restore_timestamp_observed": false,
+  "diagnostic_dropped_max": 0,
+  "request_retries_observed": 0,
+  "report": "docs\\diagnostico-gateway-20261025.md"
+}

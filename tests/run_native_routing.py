@@ -41,6 +41,8 @@ def main():
     native = ctypes.CDLL(str(library))
     failures = []
     for name in (
+        "test_gateway_trace_records_request_retry_and_winner_without_changing_deadlines",
+        "test_gateway_trace_is_bounded_and_preserves_event_order",
         "test_moved_block_is_not_redelegated_to_a_new_node",
         "test_changed_peer_claim_cannot_steal_a_return_route",
         "test_gateway_messages_cannot_replace_initial_network_provision",

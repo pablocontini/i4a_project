@@ -45,6 +45,7 @@ static struct {
     nm_network_t offer;
     nm_blocks_t blocks;
     bool blocks_ready;
+    uint64_t root_guard_until_ms;
     QueueHandle_t inbox;
     volatile unsigned dropped_requests;
     volatile unsigned duplicate_requests;
@@ -54,6 +55,31 @@ static struct {
 
 static uint64_t now_ms(void) { return (uint64_t)esp_timer_get_time() / 1000; }
 static uint64_t lease_ms(void) { return rs_lease_time_ms(manager.rs); }
+
+/* Caller holds manager.lock; guard time must not freeze during maintenance. */
+static bool root_guard_blocks(const char *uuid) {
+    return uuid && !memcmp(uuid, "000000000000", NM_UUID_LEN + 1) &&
+        now_ms() < manager.root_guard_until_ms;
+}
+
+bool nm_guard_root(uint32_t seconds) {
+    if (!manager.rs || seconds > 900 || !strcmp(manager.uuid, "000000000000")) return false;
+    WITH_LOCK(&manager.lock, {
+        manager.root_guard_until_ms = seconds ? now_ms() + (uint64_t)seconds * 1000 : 0;
+    });
+    return true;
+}
+
+uint32_t nm_root_guard_remaining_ms(void) {
+    uint32_t remaining = 0;
+    if (!manager.rs) return 0;
+    WITH_LOCK(&manager.lock, {
+        uint64_t now = now_ms();
+        if (manager.root_guard_until_ms > now)
+            remaining = (uint32_t)(manager.root_guard_until_ms - now);
+    });
+    return remaining;
+}
 
 /* Worker-only diagnostics share stdout's lock with OTA replies. */
 static void diagnostic(const char *event, const nm_message_t *msg, unsigned value)
@@ -145,13 +171,17 @@ static void process_pending(TickType_t wait)
         bool expired = nm_registry_expire(&manager.registry, now);
         switch (msg.command) {
             case NM_RESERVE:
-                msg.accepted = request_valid(&msg) &&
+                msg.accepted = request_valid(&msg) && !root_guard_blocks(msg.peer_uuid) &&
                     nm_registry_reserve(&manager.registry, msg.owner, msg.peer_uuid, &msg.link, now);
                 break;
             case NM_COMMIT:
-                msg.accepted = nm_registry_advance(&manager.registry, msg.owner, &msg.link, NM_COMMITTED, now);
+                msg.accepted = !root_guard_blocks(manager.registry.claims[msg.owner].peer_uuid) &&
+                    nm_registry_advance(&manager.registry, msg.owner, &msg.link, NM_COMMITTED, now);
                 break;
             case NM_ACTIVATE:
+                msg.accepted = !root_guard_blocks(manager.registry.claims[msg.owner].peer_uuid) &&
+                    nm_registry_advance(&manager.registry, msg.owner, &msg.link, NM_ACTIVE, now);
+                break;
             case NM_RENEW:
                 msg.accepted = nm_registry_advance(&manager.registry, msg.owner, &msg.link, NM_ACTIVE, now);
                 break;
@@ -321,7 +351,9 @@ bool nm_owns(const nm_link_id_t *link) {
 bool nm_is_blocked_uuid(const char *uuid) {
     bool blocked;
     if (!manager.rs) return true;
-    WITH_LOCK(&manager.lock, { blocked = nm_registry_blocks(&manager.registry, uuid, lease_ms()); });
+    WITH_LOCK(&manager.lock, {
+        blocked = root_guard_blocks(uuid) || nm_registry_blocks(&manager.registry, uuid, lease_ms());
+    });
     return blocked;
 }
 

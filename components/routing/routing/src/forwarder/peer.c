@@ -58,13 +58,17 @@ static void on_peer_connected(routing_t *self, const network_t *connection) {
     (void)wl_get_provision_offer(self->deps.wl, &peer_event.payload.handshake.provided_network.addr,
                                &peer_event.payload.handshake.provided_network.mask);
 
-    wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
+    rt_gw_trace(self, RT_GW_HANDSHAKE_TX, RT_GW_OK, sent, NULL, 0);
 }
 
 static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
     if (!wl_check_peer_network(self->deps.wl, event->external_network.addr,
-                               event->external_network.mask)) return;
+                               event->external_network.mask)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_BAD_NETWORK, event->dtr, NULL, 0);
+        return;
+    }
 
     if (state->global_state == GLOBAL_STATE_WITHOUT_NETWORK) {
         if (event->dtr == 0 || event->dtr >= UINT16_MAX)
@@ -104,12 +108,15 @@ static void on_handshake(routing_t *self, const rt_peer_handshake_t *event) {
 
 static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
-    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
+    if (!node_network_is_valid(&state->node_network, self->orientation)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_NO_NETWORK, event->dtr, NULL, 0);
+        return;
+    }
 
     uint32_t peer_dtr = event->dtr;
 
     if (peer_dtr == 0 || peer_dtr == UINT32_MAX) {
-        // Peer is not connected to the network
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_UNREACHABLE, peer_dtr, NULL, 0);
         return;
     }
 
@@ -117,8 +124,12 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
         /* Await a response to our path request. A repeated handshake/DTR
          * must not bypass confirmation or postpone the existing deadline. */
         if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST &&
-            state->gateway_request_timeout != 0) return;
+            state->gateway_request_timeout != 0) {
+            rt_gw_trace(self, RT_GW_DECISION, RT_GW_PENDING, peer_dtr, NULL, 0);
+            return;
+        }
         if (peer_dtr > 1) {
+            rt_gw_trace(self, RT_GW_DECISION, RT_GW_FORWARD, peer_dtr, NULL, 0);
             rt_fwd_request_own_gateway(self);
             return;
         }
@@ -149,7 +160,10 @@ static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_re
             break;
         if (event->hag_networks[i].addr == state->node_network.addr &&
             event->hag_networks[i].mask == state->node_network.mask)
+        {
+            rt_gw_trace(self, RT_GW_DECISION, RT_GW_LOOP, 0, event->hag_networks, 16);
             return;
+        }
     }
 
     for (uint32_t i = 0; i < sizeof(event->hag_networks) / sizeof(event->hag_networks[0]); i++) {
@@ -176,8 +190,10 @@ static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_re
         return;
     }
 
-    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST)
+    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_ALREADY_PENDING, 0, event->hag_networks, 16);
         return;
+    }
 
     state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
     state->dtr = 0;
@@ -186,9 +202,15 @@ static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_re
 
 static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_response_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
-    if (!node_network_is_valid(&state->node_network, self->orientation)) return;
+    if (!node_network_is_valid(&state->node_network, self->orientation)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_NO_NETWORK, event->dtr, NULL, 0);
+        return;
+    }
     if (!wl_check_peer_network(self->deps.wl, event->external_network.addr,
-                               event->external_network.mask)) return;
+                               event->external_network.mask)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_BAD_NETWORK, event->dtr, NULL, 0);
+        return;
+    }
 
     uint32_t peer_dtr = event->dtr;
 
@@ -198,6 +220,7 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
     uint32_t candidate_dtr = peer_dtr + 1;
 
     if (!should_adopt_gateway(self, candidate_dtr)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_NOT_BETTER, peer_dtr, NULL, 0);
         // Keep a working gateway at equal distance; reject worse candidates.
         return;
     }
@@ -206,6 +229,7 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
     state->is_local_root = true;
     state->dtr = candidate_dtr;
     state->gateway_request_timeout = 0;
+    rt_gw_trace(self, RT_GW_DECISION, RT_GW_ADOPT, peer_dtr, NULL, 0);
 
     add_global_route(self, &NETWORK(0, 0), self->orientation);
     rt_sibl_event_t sibl_event = {

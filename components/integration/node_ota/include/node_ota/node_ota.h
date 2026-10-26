@@ -18,6 +18,8 @@ bool node_ota_can_switch_mode(void);
 typedef esp_err_t (*node_radio_cut_fn)(uint32_t seconds);
 /* The callback only queues work. Zero restores; otherwise 1..300 seconds. */
 void node_ota_register_radio_cut(node_radio_cut_fn handler);
+/* Zero clears; 1..900 seconds refuses new direct Root admissions. */
+void node_ota_register_root_guard(node_radio_cut_fn handler);
 
 typedef void (*node_ota_reply_fn)(const node_ota_packet_t *reply, void *context);
 /* Transport-neutral coordinator entry point. Serializes callers, waits for all

@@ -18,6 +18,10 @@ bool nm_renew(const nm_link_id_t *link);
 void nm_release(const nm_link_id_t *link);
 bool nm_owns(const nm_link_id_t *link);
 bool nm_is_blocked_uuid(const char *uuid);
+/* Diagnostic, RAM-only guard. Existing active links and renewals survive.
+ * New Root admissions are refused for <=900 seconds of real elapsed time. */
+bool nm_guard_root(uint32_t seconds);
+uint32_t nm_root_guard_remaining_ms(void);
 /* Read-only local view for diagnostics; no SPI exchange or lease mutation. */
 bool nm_copy_snapshot(nm_registry_t *registry);
 void nm_tick(void);

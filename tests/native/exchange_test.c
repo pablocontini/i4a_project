@@ -31,6 +31,8 @@ static bool locked, inject_stale;
 static void (*boot_task)(void *);
 static unsigned local_restarts;
 static int create_result = pdPASS;
+static bool guard_peer_cached[4];
+static node_ota_packet_t guard_peer_request[4], guard_peer_reply[4];
 
 size_t strlen(const char *s) {
     size_t n = 0;
@@ -107,7 +109,23 @@ bool rs_broadcast(ring_share_t *rs, int component, const void *wire, uint16_t le
     if (unreachable_peers & (1U << peer)) return true;
     if (request.op == NODE_OTA_BEGIN && receiver.phase != NODE_OTA_IDLE)
         ordering_error = 1;
-    ota_receiver_handle(&peers[peer], &request, &reply);
+    if (request.op == NODE_OTA_ROOT_GUARD) {
+        uint8_t saved_role = role;
+        bool saved_cached = root_guard_cached;
+        node_ota_packet_t saved_request = root_guard_request, saved_reply = root_guard_reply;
+        role = peer;
+        /* Exercise the actual wire validator and ring ingress, not just the handler. */
+        deliver(&request);
+        node_ota_packet_t incoming;
+        if (!xQueueReceive(inbox, &incoming, 0)) { role = saved_role; return true; }
+        root_guard_cached = guard_peer_cached[peer];
+        root_guard_request = guard_peer_request[peer]; root_guard_reply = guard_peer_reply[peer];
+        handle_request(&incoming, &reply);
+        guard_peer_cached[peer] = root_guard_cached;
+        guard_peer_request[peer] = root_guard_request; guard_peer_reply[peer] = root_guard_reply;
+        role = saved_role; root_guard_cached = saved_cached;
+        root_guard_request = saved_request; root_guard_reply = saved_reply;
+    } else ota_receiver_handle(&peers[peer], &request, &reply);
     if (request.op == NODE_OTA_INFO) {
         reply.length = 53;
         reply.data[51] = (peer_ready_mask & (1U << peer)) != 0;
@@ -152,6 +170,7 @@ static int setup(node_ota_packet_t *request) {
     queued_count = emitted_count = broadcasts = ordering_error = 0;
     pending_peer = dropped_peer = reject_peer = -1;
     unreachable_peers = 0;
+    memset(guard_peer_cached, 0, sizeof(guard_peer_cached));
     broadcast_delay_us = queue_wait_us = 0;
     for (uint8_t peer = 0; peer < NODE_OTA_CENTER; ++peer) ota_receiver_init(&peers[peer], peer);
     memset(request, 0, sizeof(*request));
@@ -610,5 +629,65 @@ EXPORT int test_radio_cut_validation_retry_and_maintenance(void) {
     node_ota_put_u32(request.data, 0);
     handle_request(&request, &reply);
     CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 2 && cut_seconds == 0);
+    return 0;
+}
+
+EXPORT int test_root_guard_validation_cache_and_no_maintenance(void) {
+    node_ota_packet_t request, reply;
+    CHECK(setup(&request) == ESP_OK);
+    request.op = NODE_OTA_ROOT_GUARD; request.targets = 0x1f; request.length = 4;
+    node_ota_put_u32(request.data, 600);
+    CHECK(valid_request(&request));
+    request.targets = 0x12; CHECK(valid_request(&request));
+    CHECK(node_ota_exchange(&request, capture, NULL) == ESP_ERR_INVALID_ARG);
+    request.targets = 0x16; CHECK(!valid_request(&request)); request.targets = 0x1f;
+    request.sender = NODE_OTA_CENTER; CHECK(!valid_request(&request)); request.sender = NODE_OTA_HOST;
+    request.length = 3; CHECK(!valid_request(&request)); request.length = 4;
+    node_ota_put_u32(request.data, 901); CHECK(!valid_request(&request));
+    node_ota_put_u32(request.data, 600);
+    node_ota_register_root_guard(mock_radio_cut);
+    role = NODE_OTA_CENTER; cut_calls = 0;
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 1 && cut_seconds == 600);
+    handle_request(&request, &reply); CHECK(cut_calls == 1);
+    /* An intervening cut command must not evict the guard's idempotency cache. */
+    node_ota_packet_t cut = request; cut.op = NODE_OTA_RADIO_CUT; cut.targets = 0x12;
+    node_ota_put_u32(cut.data, 60); handle_request(&cut, &reply);
+    handle_request(&request, &reply); CHECK(cut_calls == 1);
+    CHECK(!maintenance && !test_boot_quiet && receiver.phase == NODE_OTA_IDLE);
+    ++request.sequence; set_maintenance(true, 456);
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_ERR_INVALID_STATE && cut_calls == 1);
+    set_maintenance(false, 0); node_ota_put_u32(request.data, 0);
+    handle_request(&request, &reply);
+    CHECK(node_ota_get_u32(reply.data) == ESP_OK && cut_calls == 2 && cut_seconds == 0);
+    return 0;
+}
+
+static unsigned guard_role_calls[5];
+static esp_err_t counted_guard(uint32_t seconds) {
+    if (seconds != 600 && seconds != 0) return ESP_ERR_INVALID_ARG;
+    ++guard_role_calls[role];
+    return ESP_OK;
+}
+
+EXPORT int test_root_guard_exchange_delivers_directed_hops_and_retries_idempotently(void) {
+    node_ota_packet_t request;
+    CHECK(setup(&request) == ESP_OK);
+    request.op = NODE_OTA_ROOT_GUARD; request.targets = 31; request.length = 4;
+    node_ota_put_u32(request.data, 600);
+    memset(guard_role_calls, 0, sizeof(guard_role_calls));
+    node_ota_register_root_guard(counted_guard);
+    CHECK(node_ota_exchange(&request, capture, NULL) == ESP_OK);
+    CHECK(emitted_count == 5 && !ordering_error);
+    for (unsigned i = 0; i < 5; ++i) CHECK(guard_role_calls[i] == 1);
+    emitted_count = 0;
+    CHECK(node_ota_exchange(&request, capture, NULL) == ESP_OK);
+    CHECK(emitted_count == 5 && !ordering_error);
+    for (unsigned i = 0; i < 5; ++i) CHECK(guard_role_calls[i] == 1);
+    ++request.sequence; node_ota_put_u32(request.data, 0); emitted_count = 0;
+    CHECK(node_ota_exchange(&request, capture, NULL) == ESP_OK);
+    for (unsigned i = 0; i < 5; ++i) CHECK(guard_role_calls[i] == 2);
+    CHECK(!maintenance && receiver.phase == NODE_OTA_IDLE && !test_boot_quiet);
     return 0;
 }

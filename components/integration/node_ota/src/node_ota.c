@@ -45,10 +45,14 @@ static unsigned reported_drops, reported_invalid;
  * the next boot, when otadata already marks this image valid. */
 static bool boot_recovery_pending;
 static node_radio_cut_fn radio_cut_handler;
+static node_radio_cut_fn root_guard_handler;
+static bool root_guard_cached;
+static node_ota_packet_t root_guard_request, root_guard_reply;
 static bool radio_cut_cached;
 static node_ota_packet_t radio_cut_request, radio_cut_reply;
 
 void node_ota_register_radio_cut(node_radio_cut_fn handler) { radio_cut_handler = handler; }
+void node_ota_register_root_guard(node_radio_cut_fn handler) { root_guard_handler = handler; }
 
 void node_ota_set_updates_allowed(bool allowed) { updates_allowed = allowed; }
 
@@ -119,13 +123,17 @@ static void expire_receiver(void)
 static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *reply)
 {
     expire_receiver();
-    if (request->op == NODE_OTA_RADIO_CUT) {
-        if (radio_cut_cached && request->session == radio_cut_request.session &&
-            request->sequence == radio_cut_request.sequence &&
-            request->targets == radio_cut_request.targets &&
-            request->length == radio_cut_request.length &&
-            !memcmp(request->data, radio_cut_request.data, request->length)) {
-            *reply = radio_cut_reply;
+    if (request->op == NODE_OTA_RADIO_CUT || request->op == NODE_OTA_ROOT_GUARD) {
+        bool guard = request->op == NODE_OTA_ROOT_GUARD;
+        bool *cached = guard ? &root_guard_cached : &radio_cut_cached;
+        node_ota_packet_t *saved_request = guard ? &root_guard_request : &radio_cut_request;
+        node_ota_packet_t *saved_reply = guard ? &root_guard_reply : &radio_cut_reply;
+        if (*cached && request->session == saved_request->session &&
+            request->sequence == saved_request->sequence &&
+            request->targets == saved_request->targets &&
+            request->length == saved_request->length &&
+            !memcmp(request->data, saved_request->data, request->length)) {
+            *reply = *saved_reply;
             return;
         }
         memset(reply, 0, sizeof(*reply));
@@ -139,16 +147,20 @@ static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *
         esp_err_t err = ESP_ERR_INVALID_STATE;
         if (updates_allowed && application_ready && !rs_boot_quiet(ring) && !maintenance &&
             !boot_recovery_pending && receiver.phase == NODE_OTA_IDLE) {
-            err = role == NODE_OTA_CENTER ? ESP_OK :
-                (radio_cut_handler ? radio_cut_handler(node_ota_get_u32(request->data)) : ESP_ERR_INVALID_STATE);
+            if (guard)
+                err = root_guard_handler ? root_guard_handler(node_ota_get_u32(request->data)) : ESP_ERR_INVALID_STATE;
+            else
+                err = role == NODE_OTA_CENTER ? ESP_OK :
+                    (radio_cut_handler ? radio_cut_handler(node_ota_get_u32(request->data)) : ESP_ERR_INVALID_STATE);
         }
         node_ota_put_u32(reply->data, err);
         if (err == ESP_OK) {
-            radio_cut_request = *request;
-            radio_cut_reply = *reply;
-            radio_cut_cached = true;
+            *saved_request = *request;
+            *saved_reply = *reply;
+            *cached = true;
         }
-        diagnostic("event=radio_cut_queued seconds=%lu error=0x%lx",
+        diagnostic(guard ? "event=root_guard_applied seconds=%lu error=0x%lx" :
+                          "event=radio_cut_queued seconds=%lu error=0x%lx",
                    (unsigned long)node_ota_get_u32(request->data), (unsigned long)err);
         return;
     }
@@ -202,6 +214,15 @@ static void handle_request(const node_ota_packet_t *request, node_ota_packet_t *
 
 static bool valid_request(const node_ota_packet_t *p)
 {
+    if (p->op == NODE_OTA_ROOT_GUARD) {
+        unsigned radios = p->targets & 0x0f;
+        /* Host selects all roles; the coordinator directs one SPI hop at a time. */
+        bool targets_ok = p->targets == NODE_OTA_ROLES ||
+            ((p->targets & (1U << NODE_OTA_CENTER)) && !(p->targets & ~NODE_OTA_ROLES) &&
+             radios && !(radios & (radios - 1)));
+        return p->sender == NODE_OTA_HOST && targets_ok &&
+            p->length == 4 && p->offset == 0 && node_ota_get_u32(p->data) <= 900;
+    }
     if (p->op == NODE_OTA_RADIO_CUT) {
         unsigned radios = p->targets & 0x0f;
         return p->sender == NODE_OTA_HOST && p->length == 4 &&
@@ -258,6 +279,7 @@ esp_err_t node_ota_init(ring_share_t *rs, uint8_t device_role)
     application_ready = false;
     updates_allowed = true;
     radio_cut_cached = false;
+    root_guard_cached = false;
     maintenance = false;
     maintenance_session = 0;
     boot_release_at = 0;
@@ -283,7 +305,9 @@ esp_err_t node_ota_exchange(const node_ota_packet_t *request,
                             node_ota_reply_fn emit, void *context)
 {
     if (!ring || role != NODE_OTA_CENTER) return ESP_ERR_INVALID_STATE;
-    if (!request || !emit || !valid_request(request)) return ESP_ERR_INVALID_ARG;
+    if (!request || !emit || !valid_request(request) ||
+        (request->op == NODE_OTA_ROOT_GUARD && request->targets != NODE_OTA_ROLES))
+        return ESP_ERR_INVALID_ARG;
     if (request->op == NODE_OTA_BEGIN && (!updates_allowed || !application_ready || rs_boot_quiet(ring))) {
         node_ota_packet_t reply;
         handle_request(request, &reply);
@@ -459,7 +483,8 @@ static void serial_line(char *line, size_t length)
         return;
     }
     if (request.sender != NODE_OTA_HOST ||
-        !((request.op >= NODE_OTA_INFO && request.op <= NODE_OTA_REBOOT) || request.op == NODE_OTA_RADIO_CUT)) {
+        !((request.op >= NODE_OTA_INFO && request.op <= NODE_OTA_REBOOT) ||
+          request.op == NODE_OTA_RADIO_CUT || request.op == NODE_OTA_ROOT_GUARD)) {
         diagnostic("event=serial_invalid_request sender=%u op=%u", request.sender, request.op);
         return;
     }

@@ -24,6 +24,7 @@ enum node_ota_op {
     NODE_OTA_ABORT,
     NODE_OTA_REBOOT,
     NODE_OTA_RADIO_CUT = 9, /* Diagnostic control; does not enter OTA maintenance. */
+    NODE_OTA_ROOT_GUARD = 10, /* RAM-only new Root admission guard, all five roles. */
 };
 
 enum node_ota_phase {

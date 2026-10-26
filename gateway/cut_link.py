@@ -5,6 +5,7 @@ import datetime as dt
 import hashlib
 import ipaddress
 import json
+import re
 from pathlib import Path
 import struct
 import sys
@@ -82,6 +83,32 @@ def require_reference(folder, since, now=None):
         raise UpdateError('Reference changed interface or source IPv4; no cut sent')
 
 
+def require_root_guard(folder, control_folder, cut_seconds, now=None):
+    """Require five application ACKs plus fresh live central guard telemetry."""
+    now = now or dt.datetime.now(dt.timezone.utc)
+    folder = Path(folder)
+    summary = json.loads((folder / 'summary.json').read_text(encoding='utf-8-sig'))
+    session = json.loads((folder / 'session.json').read_text(encoding='utf-8-sig'))
+    started = dt.datetime.fromisoformat(session['started_utc'])
+    duration = summary.get('seconds', 0)
+    budget = duration - (now - started).total_seconds()
+    if not summary.get('all_roles_acknowledged') or summary.get('failures') or \
+            not 0 < duration <= 900 or not 0 <= (now-started).total_seconds() or budget < cut_seconds + 30:
+        raise UpdateError('Root guard lacks five ACKs or sufficient remaining time; no cut sent')
+    live = None
+    for line in (Path(control_folder) / 'timeline.jsonl').read_text(encoding='utf-8').splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        match = re.search(r'board=5 event=root_guard remaining_ms=(\d+)', event.get('text', ''))
+        if event.get('kind') == 'uart' and match:
+            live = (event, int(match[1]))
+    if not live or not 0 <= (now-dt.datetime.fromisoformat(live[0]['utc'])).total_seconds() <= 10 or \
+            live[1] < (cut_seconds + 30) * 1000:
+        raise UpdateError('Root guard has no fresh live countdown; no cut sent')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port', required=True)
@@ -95,6 +122,7 @@ def main():
     parser.add_argument('--baseline', type=float, default=0, help='Record this many seconds before sending the cut')
     parser.add_argument('--watch', type=float, default=0, help='Record this many seconds after the ACK (include cut and restoration)')
     parser.add_argument('--require-reference', action='store_true', help='Require healthy bound probes in --marker-output before cutting')
+    parser.add_argument('--require-root-guard', type=Path, help='Successful root_guard.py record directory; require fresh live countdown')
     args = parser.parse_args()
     seconds = 0 if args.restore else args.seconds
     if not args.restore and not 1 <= seconds <= 300:
@@ -103,7 +131,13 @@ def main():
         parser.error('--baseline must be 0..600 and --watch 0..1800 seconds')
     if args.require_reference and not args.marker_output:
         parser.error('--require-reference needs --marker-output')
+    if args.require_root_guard and (not args.record_output or args.restore):
+        parser.error('--require-root-guard needs --record-output and a timed cut')
+    if args.require_root_guard and args.watch < seconds + 30:
+        parser.error('--require-root-guard needs --watch >= seconds + 30 for cleanup and recovery')
     transport = None
+    updater = None
+    guard_cleared = False
     recorder = None
     failure = None
 
@@ -117,6 +151,14 @@ def main():
             recorder.event('marker', text=text, marked_utc=utc())
         if args.marker_output:
             write_marker(args.marker_output, text)
+
+    def clear_guard():
+        nonlocal guard_cleared
+        updater.roles = 0x1f
+        updater.command(10, struct.pack('<I', 0))
+        guard_cleared = True
+        mark('ROOT_GUARD_CLEAR_ACK')
+        report('All five roles acknowledged clearing the Root admission guard.')
 
     try:
         if args.record_output:
@@ -148,6 +190,8 @@ def main():
         observe(transport, args.baseline)
         if args.require_reference:
             require_reference(args.marker_output, baseline_since)
+        if args.require_root_guard:
+            require_root_guard(args.require_root_guard, args.record_output, seconds)
         updater.roles = (1 << ROLES[args.role]) | (1 << ROLES['center'])
         mark('RESTORE_REQUEST' if not seconds else 'CUT_REQUEST')
         updater.command(RADIO_CUT, struct.pack('<I', seconds))
@@ -155,7 +199,13 @@ def main():
               ('restore now.' if not seconds else f'cut for {seconds} seconds with automatic restoration.'))
         mark('RESTORE_ACK' if not seconds else 'CUT_ACK')
         report('Verify the link loss/restoration using telemetry and client pings. An ACK confirms queuing.')
-        observe(transport, args.watch)
+        if args.require_root_guard:
+            # Restore admission after the bounded radio cut, then observe reconnection.
+            observe(transport, seconds + 15)
+            clear_guard()
+            observe(transport, args.watch - seconds - 15)
+        else:
+            observe(transport, args.watch)
         if args.watch:
             mark('OBSERVATION_END')
             updater.roles = 0x1f
@@ -167,12 +217,20 @@ def main():
         report(f'Radio control failed: {failure}')
         return 1
     finally:
+        if args.require_root_guard and updater and transport and not guard_cleared:
+            try:
+                clear_guard()
+            except (UpdateError, OSError, ValueError, KeyboardInterrupt) as exc:
+                failure = failure or f'Root guard cleanup incomplete: {exc}'
+                report('Root guard cleanup incomplete; its RAM deadline remains the fallback.')
         if transport:
             transport.close()
         if recorder:
             (args.record_output / 'summary.json').write_text(json.dumps({
                 'stopped_utc': utc(), 'counts': recorder.counts,
-                'failures': [failure] if failure else []
+                'failures': [failure] if failure else [],
+                'root_guard_controlled': bool(args.require_root_guard),
+                'root_guard_cleared': guard_cleared if args.require_root_guard else None
             }, indent=2), encoding='utf-8')
             recorder.close()
 

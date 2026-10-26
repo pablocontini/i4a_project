@@ -1,0 +1,10 @@
+{
+  "built_utc": "2026-10-26T02:29:24.470009+00:00",
+  "variant": "grillo",
+  "ssid": "ComNetAR - Grillo",
+  "diagnostics": true,
+  "main_bin_sha256": "0b9f653936a8fa9b2bdf83c0194c6cacbe328fff44bec2a3b1a76e02fbcbf603",
+  "size": 907152,
+  "elf_sha256_reported_by_firmware": "57bb3d29051e763cecb175eb700d6c92894ba8065e4b14f8bf1c01f7499817fc",
+  "sources_zip_sha256": "6bb10a5a91f423de500735b8f5dca844312d673178c4d28a2f9a5e4d06b201e2"
+}

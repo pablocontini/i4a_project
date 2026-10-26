@@ -40,6 +40,7 @@ La implementación, límites de las reservas y comandos de migración están en
 | Nuevo arranque de Ramona | El usuario no lo ordenó, pero indicó que pudo producirse al cambiar cables. Este Ramona informa encendido (`reset=1`); no hay registro anterior al evento para determinar la causa. No se atribuye al firmware. |
 | Cambio de topología | Ramona volvió a conectar directamente a Root por Norte y el lateral pasó a Este Ramona ↔ Oeste Grillo. Se conservaron bloques distintos. |
 | Corte Este con firmware nuevo | Corte de 60 s; Internet volvió por Ramona en 18,577 s, antes de restaurarse la radio principal. Retorno posterior al directo, bloques conservados y sin regresiones de uptime en cuatro monitores. [Informe final](prueba-corte-este-v3-20261025.md). |
+| Intento tardío con firmware nuevo | Corte de 180 s e incorporación de Ramona. Internet volvió en 116,185 s por Norte directo a Root. No validó el camino tardío por Ramona; bloques conservados, sin nuevas pérdidas persistentes al incorporarla. [Informe](alternativo-tardio-v3-20261025.md). |
 
 El detalle de capturas, errores USB, reasignaciones de COM y resultados
 intermedios está en el informe de despliegue. No confundir el cierre sin
@@ -53,14 +54,14 @@ Se repitieron satisfactoriamente estas suites sobre el código a publicar:
 
 | Suite nativa | Casos |
 |---|---:|
-| Enrutamiento | 34 |
+| Enrutamiento | 36 |
 | Vecinos, reservas, persistencia y admisión | 36 |
 | Ciclo de vida Wi-Fi | 7 |
 | Hooks de red | 5 |
-| OTA y control de radio | 22 |
-| **Total C** | **104** |
+| OTA y control de radio | 24 |
+| **Total C** | **110** |
 
-También pasó la compatibilidad del protocolo C/Python y los **61 tests Python**
+También pasó la compatibilidad del protocolo C/Python y los **75 tests Python**
 de `python -m unittest discover -s tests -p 'test_*.py'`. Las suites C se
 ejecutan con `tests/run_native_{routing,neighbors,wireless,routing_hooks,ota}.py`
 y `--cc app/build/tools/tcc/tcc.exe` en este entorno Windows.
@@ -101,3 +102,25 @@ enlace: agotar el registro rechaza nuevas ofertas de forma segura. No existe
 todavía recolección automática de propietarios históricos. La sincronización
 de radios libres es una observación, no una causa demostrada de ausencia
 de redundancia en esta red.
+
+
+## Actualizaci?n final del 26/10
+
+Se publican el filtro temporal de nuevos directos a Root, su controlador
+con comprobaci?n del plazo y cancelaci?n, y el diagn?stico acotado `I4AGW`.
+Los plazos y mensajes de routing no se modificaron por la instrumentaci?n.
+El filtro usa RAM, tiene vencimiento y conserva enlaces ya admitidos.
+
+El [ensayo con bloqueo](alternativo-tardio-con-bloqueo-20261025.md) valid?
+recuperaci?n por una alternativa aparecida despu?s del corte. La
+[repetici?n con diagn?stico](diagnostico-gateway-20261025.md) confirm? el
+camino por Ramona y midi? 14,864 segundos entre solicitud y aceptaci?n,
+sin reintentos ni desbordes en los monitores. No demuestra la causa de
+la demora mayor de la corrida anterior ni estabilidad prolongada de esta versi?n.
+
+La [evidencia del 26](evidencias/20261026/README.md) contiene resultados,
+eventos de gateway, recibo del archivo completo y verificaci?n reciente de
+los quince roles. Los binarios ya cargados coinciden con las 170 fuentes
+archivadas por paquete, normalizando finales de l?nea. Una nueva consulta
+confirm? que los tres nodos ya ten?an la ?ltima imagen; no se reescribi?
+innecesariamente el mismo binario ni se reiniciaron para esta publicaci?n.

@@ -7,6 +7,7 @@
 #include "node.h"
 #include "node_ota/node_ota.h"
 #include "node_radio_cut.h"
+#include "neighbor_manager/neighbor_manager.h"
 #include "task_config.h"
 
 static DevicePtr cut_device;
@@ -80,7 +81,20 @@ static void control_task(void *arg) {
     }
 }
 
+static esp_err_t root_guard(uint32_t seconds) {
+    if (!nm_guard_root(seconds)) return ESP_ERR_INVALID_ARG;
+    flockfile(stdout);
+    printf("\nI4AGUARD t_ms=%lld board=%u event=applied seconds=%lu remaining_ms=%lu\n",
+        (long long)(esp_timer_get_time() / 1000),
+        (unsigned)node_get_device_orientation() + 1, (unsigned long)seconds,
+        (unsigned long)nm_root_guard_remaining_ms());
+    fflush(stdout);
+    funlockfile(stdout);
+    return ESP_OK;
+}
+
 esp_err_t node_radio_cut_init(DevicePtr device) {
+    node_ota_register_root_guard(root_guard);
     if (node_get_device_orientation() == NODE_DEVICE_ORIENTATION_CENTER ||
         node_is_device_center_root()) return ESP_OK;
     if (!device || cut_commands) return ESP_ERR_INVALID_STATE;

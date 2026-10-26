@@ -72,6 +72,7 @@ static void snapshot(routing_t *rt) {
     spi_get_diagnostics(&spi);
     ring_link_get_diagnostics(&link);
     int64_t now = esp_timer_get_time() / 1000;
+    uint32_t root_guard_ms = nm_root_guard_remaining_ms();
     flockfile(stdout);
     printf("\nI4ACAP t_ms=%lld board=%u event=routes available=%u", (long long)now, rt->orientation, table_ok);
     if (table_ok) {
@@ -92,6 +93,8 @@ static void snapshot(routing_t *rt) {
            " channel=%u rssi=%d bssid=%02x%02x%02x%02x%02x%02x ap_error=%d clients=%u\n",
            (long long)now, rt->orientation, mode_error, mode, station_error, ap.primary, ap.rssi,
            ap.bssid[0], ap.bssid[1], ap.bssid[2], ap.bssid[3], ap.bssid[4], ap.bssid[5], ap_error, clients.num);
+    printf("I4ACAP t_ms=%lld board=%u event=root_guard remaining_ms=%lu\n",
+           (long long)now, rt->orientation, (unsigned long)root_guard_ms);
     printf("I4ACAP t_ms=%lld board=%u event=heap free=%u minimum=%u largest=%u diag_stack_min=%u\n",
            (long long)now, rt->orientation, (unsigned)esp_get_free_heap_size(),
            (unsigned)esp_get_minimum_free_heap_size(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
@@ -132,11 +135,35 @@ static void identity(routing_t *rt) {
     funlockfile(stdout);
 }
 
+static uint32_t gateway_clock_ms(void) {
+    return (uint32_t)(esp_timer_get_time()/1000);
+}
+
+static void gateway_trace(routing_t *rt) {
+    /* Small drain batches keep task stack bounded. UART is outside locks. */
+    rt_gw_trace_t records[4];
+    uint32_t dropped=0;
+    for (unsigned batch=0; batch<RT_GW_TRACE_CAPACITY/4; ++batch) {
+        size_t n=rt_gw_trace_drain(rt, records, 4, &dropped);
+        for (size_t i=0; i<n; ++i) {
+            const rt_gw_trace_t *r=&records[i];
+            printf("I4AGW t_ms=%" PRIu32 " board=%u seq=%" PRIu32
+                " event=%u reason=%u value=%" PRIu32 " dtr=%" PRIu32
+                " state=%u timeout_ms=%" PRIu32 " path_hash=%08" PRIx32
+                " hops=%u dropped=%" PRIu32 "\n",
+                r->time_ms, rt->orientation, r->sequence, r->event, r->reason,
+                r->value, r->dtr, r->state, r->timeout_ms, r->path_hash, r->hops, dropped);
+        }
+        if (n<4) break;
+    }
+}
+
 static void diagnostic_task(void *arg) {
     routing_t *rt = arg;
     for (unsigned sample = 0;; ++sample) {
         /* USB monitors can attach after boot; repeat identity without reset. */
         if (sample % 15 == 0) identity(rt);
+        gateway_trace(rt);
         snapshot(rt);
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
@@ -145,6 +172,7 @@ static void diagnostic_task(void *arg) {
 
 esp_err_t capture_diagnostics_start(routing_t *routing) {
 #if CONFIG_I4A_CAPTURE_DIAGNOSTICS
+    routing->gw_clock_ms=gateway_clock_ms;
     return xTaskCreate(diagnostic_task, "link_capture", 4096, routing, 1, NULL) == pdPASS ? ESP_OK : ESP_ERR_NO_MEM;
 #else
     (void)routing;
