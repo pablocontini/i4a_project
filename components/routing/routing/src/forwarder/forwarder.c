@@ -43,8 +43,9 @@ static void on_tick(routing_t *self, uint32_t dt_ms) {
             rt_fwd_publish_provision(self);
         }
     }
-    if (state->global_state != GLOBAL_STATE_ON_GW_REQUEST ||
-        state->local_state != LOCAL_STATE_CONNECTED ||
+    /* Transit requests keep the current DTR and gateway. Their retry deadline
+     * still runs even while this node remains fully connected. */
+    if (state->local_state != LOCAL_STATE_CONNECTED ||
         state->gateway_request_timeout == 0)
         return;
 
@@ -72,6 +73,8 @@ bool create_forwarder_core(routing_t *self) {
     state->is_local_root = false;
     state->dtr = 0;
     state->gateway_request_timeout = 0;
+    state->gateway_relay_pending = false;
+    memset(state->gateway_relay_path, 0, sizeof(state->gateway_relay_path));
     state->provision_retry_timeout = 0;
 
     rt_fwd_sibl_set_required_callbacks(&self->role.impl);

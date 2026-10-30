@@ -1,0 +1,38 @@
+{
+  "test_transient_renew_failure_preserves_transport_and_retries": {
+    "passed": false,
+    "failure_line": 105
+  },
+  "test_persistent_rpc_loss_expires_without_extending_lease_or_spinning": {
+    "passed": false,
+    "failure_line": 117
+  },
+  "test_slow_failed_rpc_keeps_valid_lease_and_rate_limits_from_completion": {
+    "passed": false,
+    "failure_line": 130
+  },
+  "test_expiry_during_rpc_prevents_buffer_delivery": {
+    "passed": true,
+    "failure_line": 0
+  },
+  "test_replaced_owner_during_rpc_prevents_buffer_delivery": {
+    "passed": true,
+    "failure_line": 0
+  },
+  "test_shutdown_during_rpc_prevents_buffer_delivery": {
+    "passed": true,
+    "failure_line": 0
+  },
+  "test_partial_frame_still_has_bounded_completion_time": {
+    "passed": false,
+    "failure_line": 165
+  },
+  "test_lost_ownership_and_explicit_stop_prevent_send": {
+    "passed": true,
+    "failure_line": 0
+  },
+  "test_lost_renew_reply_does_not_allow_another_radio_to_replace_active_root": {
+    "passed": false,
+    "failure_line": 192
+  }
+}

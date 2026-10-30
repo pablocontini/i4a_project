@@ -145,6 +145,10 @@ static void on_critical_section(void *ctx) {
                 if (self->role.impl.on_sibl_new_gateway_winner)
                     self->role.impl.on_sibl_new_gateway_winner(self, &ev->payload.new_gateway_winner);
                 break;
+            case SIBL_GATEWAY_CONFIRMATION:
+                if (self->role.impl.on_sibl_gateway_confirmation)
+                    self->role.impl.on_sibl_gateway_confirmation(self, &ev->payload.new_gateway_winner);
+                break;
             default:
                 os_panic("Unknown sibling message (id = %u) -- aborting", ev->event_id);
                 return;

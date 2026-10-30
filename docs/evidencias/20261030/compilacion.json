@@ -1,0 +1,13 @@
+{
+  "built_utc": "2026-10-30T18:26:53.518930+00:00",
+  "variant": "grillo",
+  "ssid": "ComNetAR - Grillo",
+  "diagnostics": true,
+  "main_bin_sha256": "4c78bfae4a386de8d8e8005abbbb30ca8e32e8267d17fdd09c8052f72b1b0c91",
+  "size": 908016,
+  "elf_sha256_reported_by_firmware": "5547aef3d8bc9265723f2d146309e765c7907a9f8198086815130a15f7feb350",
+  "sources_zip_sha256": "cb15729d9ba3242d5d6ef0a6db7b6fdf32833393f620cce1249a4b19f05f5f01",
+  "bundle_local": "app/build/cuarto-nodo-20261030/grillo",
+  "source_archive_matches_worktree": true,
+  "flashed": false
+}

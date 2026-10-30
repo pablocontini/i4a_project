@@ -15,6 +15,7 @@ typedef struct {
     nm_network_t provided_network;
     nm_network_t peer_network;
     uint64_t renewed_ms;
+    uint64_t renew_retry_at_ms;
 } peer_session_t;
 
 bool peer_session_init(peer_session_t *session);

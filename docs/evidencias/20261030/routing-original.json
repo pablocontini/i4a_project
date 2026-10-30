@@ -1,0 +1,67 @@
+{
+  "revision": "19ed090b8d1047051fcc577e2726805abda761b5",
+  "failed": 14,
+  "total": 15,
+  "results": [
+    {
+      "test": "test_transit_request_preserves_working_parent_and_distance",
+      "failure_line": 1112
+    },
+    {
+      "test": "test_transit_retry_preserves_live_uplink_and_original_deadline",
+      "failure_line": 1138
+    },
+    {
+      "test": "test_confirmation_answers_pending_child_once_without_reelection",
+      "failure_line": 1173
+    },
+    {
+      "test": "test_pending_confirmation_survives_failed_peer_send",
+      "failure_line": 1199
+    },
+    {
+      "test": "test_unsolicited_gateway_winner_does_not_reply_to_parent",
+      "failure_line": 1224
+    },
+    {
+      "test": "test_early_peer_gateway_request_cannot_block_initial_provision",
+      "failure_line": 1235
+    },
+    {
+      "test": "test_better_gateway_still_replaces_live_parent_after_transit_request",
+      "failure_line": 0
+    },
+    {
+      "test": "test_three_node_transit_confirmation_finishes_without_echo_or_reselection",
+      "failure_line": 1298
+    },
+    {
+      "test": "test_child_restart_cannot_replace_a_live_parent",
+      "failure_line": 1342
+    },
+    {
+      "test": "test_unknown_sibling_distance_cannot_steal_a_live_parent",
+      "failure_line": 1382
+    },
+    {
+      "test": "test_confirmation_dispatch_is_safe_for_root_center_and_home",
+      "failure_line": 1416
+    },
+    {
+      "test": "test_selected_parent_distance_increase_requires_pending_confirmation",
+      "failure_line": 1441
+    },
+    {
+      "test": "test_four_nodes_confirm_only_forwarded_child_then_retry_other_return_path",
+      "failure_line": 1494
+    },
+    {
+      "test": "test_confirmation_preserves_an_unrelated_outbound_request",
+      "failure_line": 1548
+    },
+    {
+      "test": "test_unsolicited_improvement_does_not_confirm_an_unforwarded_child_path",
+      "failure_line": 1581
+    }
+  ]
+}

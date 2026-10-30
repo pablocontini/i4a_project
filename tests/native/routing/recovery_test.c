@@ -24,6 +24,7 @@ static bool reject_peer_claim;
 static bool publish_success;
 static unsigned provision_failures_remaining;
 static unsigned gateway_response_failures_remaining, panic_count;
+static unsigned peer_send_failures_remaining;
 static mutex_t *created_mutexes[32];
 static unsigned created_mutex_count;
 static wireless_callbacks_t wireless_callbacks;
@@ -102,6 +103,10 @@ bool wl_send_peer_message(wireless_t *wl, const void *data, uint16_t len) {
     if (len != sizeof(peer_event)) return false;
     memcpy(&peer_event, data, len);
     ++peer_count;
+    if (peer_send_failures_remaining) {
+        --peer_send_failures_remaining;
+        return false;
+    }
     return true;
 }
 
@@ -130,6 +135,7 @@ static void reset_capture(void) {
     publish_success = true;
     provision_failures_remaining = 0;
     gateway_response_failures_remaining = panic_count = 0;
+    peer_send_failures_remaining = 0;
     memset(&routing_callback, 0, sizeof(routing_callback));
 }
 
@@ -211,6 +217,11 @@ EXPORT int test_gateway_messages_cannot_replace_initial_network_provision(void) 
     reset_capture();
     routing_t self;
     CHECK(forwarder(&self,ORIENTATION_EAST,0));
+    rt_peer_new_gateway_request_t early = {0};
+    early.hag_networks[0] = NETWORK(0x0A600000, 0xFFE00000);
+    self.role.impl.on_peer_new_gateway_request(&self, &early);
+    CHECK(self.role.state.forwarder.global_state == GLOBAL_STATE_WITHOUT_NETWORK);
+    CHECK(self.node_state.routing_table.count == 0 && !sibling_count);
     rt_peer_update_dtr_t dtr={.dtr=1};
     self.role.impl.on_peer_update_dtr(&self,&dtr);
     CHECK(self.role.state.forwarder.global_state==GLOBAL_STATE_WITHOUT_NETWORK);
@@ -476,9 +487,12 @@ EXPORT int test_sibling_gateway_winner_preserves_node_distance(void) {
     self.role.state.forwarder.dtr = 0;
     self.role.state.forwarder.global_state = GLOBAL_STATE_ON_GW_REQUEST;
     self.role.state.forwarder.local_state = LOCAL_STATE_CONNECTED;
+    self.role.state.forwarder.gateway_relay_pending = true;
+    self.role.state.forwarder.gateway_relay_path[0] = NETWORK(0x0A440000, 0xFFFC0000);
     rt_sibl_new_gateway_winner_t winner = {
         .network = NETWORK(0x0A000000, 0xFF000000), .dtr = 2,
     };
+    winner.confirmed_path[0] = self.role.state.forwarder.gateway_relay_path[0];
     self.role.impl.on_sibl_new_gateway_winner(&self, &winner);
     CHECK(self.role.state.forwarder.dtr == 2);
     CHECK(!self.role.state.forwarder.is_local_root);
@@ -646,8 +660,9 @@ EXPORT int test_late_longer_uplink_confirms_path_and_recovers(void) {
     root_s.role.impl.on_sibl_new_gateway_winner(&root_s, &winner);
     rt_peer_new_gateway_response_t reply = peer_event.payload.new_gateway_response;
     ramona_n.role.impl.on_peer_new_gateway_response(&ramona_n, &reply);
+    CHECK(sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION);
     winner = sibling_event.payload.new_gateway_winner;
-    ramona_e.role.impl.on_sibl_new_gateway_winner(&ramona_e, &winner);
+    ramona_e.role.impl.on_sibl_gateway_confirmation(&ramona_e, &winner);
     reply = peer_event.payload.new_gateway_response;
     CHECK(reply.dtr == 2);
     grillo.role.impl.on_peer_new_gateway_response(&grillo, &reply);
@@ -870,6 +885,7 @@ EXPORT int test_gateway_request_retries_after_loss_and_stops_on_winner(void) {
     reset_capture();
     routing_t self;
     CHECK(forwarder(&self, ORIENTATION_WEST, 2));
+    self.node_state.routing_table.default_gateway = 0;
     rt_sibl_send_new_gateway_request_t request = {0};
     self.role.impl.on_sibl_send_new_gateway_request(&self, &request);
     CHECK(peer_count == 1);
@@ -893,7 +909,7 @@ EXPORT int test_lost_non_gateway_link_reannounces_return_path(void) {
     self.role.impl.on_peer_lost(&self, NULL);
     CHECK(sibling_count == 1 && sibling_event.event_id == SIBL_SEND_NEW_GATEWAY_REQUEST);
     CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_WEST);
-    CHECK(self.role.state.forwarder.dtr == 0);
+    CHECK(self.role.state.forwarder.dtr == 3);
     reset_capture();
     CHECK(forwarder(&self, ORIENTATION_SOUTH, 1));
     self.role.impl.on_peer_lost(&self, NULL);
@@ -911,6 +927,7 @@ EXPORT int test_hag_cycle_does_not_route_own_network_through_peer(void) {
     self.role.impl.on_peer_new_gateway_request(&self, &request);
     CHECK(self.node_state.routing_table.count == 0 && sibling_count == 0);
     CHECK(self.role.state.forwarder.dtr == 2);
+    CHECK(!self.role.state.forwarder.gateway_relay_pending);
     return 0;
 }
 
@@ -1066,6 +1083,7 @@ EXPORT int test_gateway_trace_is_bounded_and_preserves_event_order(void) {
 EXPORT int test_gateway_trace_records_request_retry_and_winner_without_changing_deadlines(void) {
     reset_capture(); routing_t self;
     CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    self.node_state.routing_table.default_gateway = 0;
     self.gw_clock_ms=diagnostic_clock;
     rt_sibl_send_new_gateway_request_t request={0};
     self.role.impl.on_sibl_send_new_gateway_request(&self,&request);
@@ -1079,5 +1097,488 @@ EXPORT int test_gateway_trace_records_request_retry_and_winner_without_changing_
     CHECK(r[1].event==RT_GW_RETRY_TX && r[1].path_hash==r[0].path_hash);
     CHECK(r[2].event==RT_GW_DECISION && r[2].reason==RT_GW_ADOPT);
     CHECK(r[2].timeout_ms==0 && self.role.state.forwarder.dtr==2 && peer_count==2);
+    return 0;
+}
+
+EXPORT int test_transit_request_preserves_working_parent_and_distance(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    self.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    network_t original = self.role.state.forwarder.node_network;
+    rt_peer_new_gateway_request_t request = {0};
+    request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    self.role.impl.on_peer_new_gateway_request(&self, &request);
+    CHECK(self.role.state.forwarder.dtr == 2);
+    CHECK(self.role.state.forwarder.gateway_relay_pending);
+    CHECK(self.role.state.forwarder.global_state == GLOBAL_STATE_WITH_NETWORK);
+    CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    /* The descendant's old path may still depend on this node. Its delayed
+     * response must not become a new, longer principal or generate an echo. */
+    rt_peer_new_gateway_response_t delayed = {
+        .external_network = NETWORK(0x0A440000, 0xFFFC0000), .dtr = 3,
+    };
+    self.role.impl.on_peer_new_gateway_response(&self, &delayed);
+    CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(self.role.state.forwarder.dtr == 2 && sibling_count == 1 && !peer_count);
+    CHECK(self.role.state.forwarder.node_network.addr == original.addr);
+    CHECK(!network_change_count && !ap_enable_count && !mutex_errors);
+    return 0;
+}
+
+EXPORT int test_transit_retry_preserves_live_uplink_and_original_deadline(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_NORTH, 2));
+    self.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    self.role.state.forwarder.is_local_root = true;
+    rt_sibl_send_new_gateway_request_t request = {0};
+    request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    self.role.impl.on_sibl_send_new_gateway_request(&self, &request);
+    CHECK(self.role.state.forwarder.dtr == 2 && self.role.state.forwarder.is_local_root);
+    CHECK(self.role.state.forwarder.global_state == GLOBAL_STATE_WITH_NETWORK);
+    CHECK(self.role.state.forwarder.gateway_request_timeout == 30000 && peer_count == 1);
+    self.role.impl.on_tick(&self, 29999);
+    self.role.impl.on_sibl_send_new_gateway_request(&self, &request);
+    CHECK(self.role.state.forwarder.gateway_request_timeout == 1 && peer_count == 1);
+    self.role.impl.on_tick(&self, 1);
+    CHECK(peer_count == 2 && peer_event.event_id == PEER_NEW_GATEWAY_REQUEST);
+    rt_peer_new_gateway_response_t confirmed = {
+        .external_network = NETWORK(0x0A000000, 0xFF000000), .dtr = 1,
+    };
+    self.role.impl.on_peer_new_gateway_response(&self, &confirmed);
+    CHECK(sibling_count == 1 && sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION);
+    CHECK(sibling_event.payload.new_gateway_winner.dtr == 2);
+    CHECK(self.role.state.forwarder.gateway_request_timeout == 0);
+    CHECK(self.role.state.forwarder.dtr == 2 && self.role.state.forwarder.is_local_root);
+    CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    self.role.impl.on_tick(&self, 60000);
+    self.role.impl.on_peer_new_gateway_response(&self, &confirmed);
+    CHECK(peer_count == 2 && sibling_count == 1); /* no unsolicited confirmation */
+    return 0;
+}
+
+EXPORT int test_confirmation_answers_pending_child_once_without_reelection(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    self.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    rt_peer_new_gateway_request_t request = {0};
+    request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    self.role.impl.on_peer_new_gateway_request(&self, &request);
+    rt_sibl_new_gateway_winner_t confirmed = {
+        .network = self.role.state.forwarder.node_network, .dtr = 2,
+    };
+    memcpy(confirmed.confirmed_path, request.hag_networks, sizeof(confirmed.confirmed_path));
+    CHECK(self.role.impl.on_sibl_gateway_confirmation);
+    self.role.impl.on_sibl_gateway_confirmation(&self, &confirmed);
+    CHECK(peer_count == 1 && peer_event.event_id == PEER_NEW_GATEWAY_RESPONSE);
+    CHECK(peer_event.payload.new_gateway_response.dtr == 2);
+    CHECK(!self.role.state.forwarder.gateway_relay_pending);
+    self.role.impl.on_sibl_gateway_confirmation(&self, &confirmed);
+    CHECK(peer_count == 1 && sibling_count == 1);
+    CHECK(self.role.state.forwarder.dtr == 2 && !self.role.state.forwarder.is_local_root);
+    CHECK(self.role.state.forwarder.global_state == GLOBAL_STATE_WITH_NETWORK);
+    CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(!network_change_count && !ap_enable_count);
+    return 0;
+}
+
+EXPORT int test_pending_confirmation_survives_failed_peer_send(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 2));
+    self.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    rt_peer_new_gateway_request_t request = {0};
+    request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    self.role.impl.on_peer_new_gateway_request(&self, &request);
+    rt_sibl_new_gateway_winner_t confirmed = {
+        .network = self.role.state.forwarder.node_network, .dtr = 2,
+    };
+    memcpy(confirmed.confirmed_path, request.hag_networks, sizeof(confirmed.confirmed_path));
+    CHECK(self.role.impl.on_sibl_gateway_confirmation);
+    peer_send_failures_remaining = 1;
+    self.role.impl.on_sibl_gateway_confirmation(&self, &confirmed);
+    CHECK(peer_count == 1 && self.role.state.forwarder.gateway_relay_pending);
+    /* The child retries after losing its response; this must reopen the
+     * upstream path request rather than remain permanently suppressed. */
+    self.role.impl.on_peer_new_gateway_request(&self, &request);
+    CHECK(sibling_count == 2);
+    self.role.impl.on_sibl_gateway_confirmation(&self, &confirmed);
+    CHECK(peer_count == 2 && !self.role.state.forwarder.gateway_relay_pending);
+    self.role.impl.on_sibl_gateway_confirmation(&self, &confirmed);
+    CHECK(peer_count == 2 && self.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    return 0;
+}
+
+EXPORT int test_unsolicited_gateway_winner_does_not_reply_to_parent(void) {
+    reset_capture();
+    routing_t sibling, root_radio;
+    CHECK(forwarder(&sibling, ORIENTATION_EAST, 2));
+    CHECK(forwarder(&root_radio, ORIENTATION_WEST, 1));
+    rt_sibl_new_gateway_winner_t winner = {
+        .network = NETWORK(0x0A000000, 0xFF000000), .dtr = 2,
+    };
+    sibling.role.impl.on_sibl_new_gateway_winner(&sibling, &winner);
+    root_radio.role.impl.on_sibl_new_gateway_winner(&root_radio, &winner);
+    CHECK(!peer_count && !sibling_count);
+    return 0;
+}
+
+EXPORT int test_early_peer_gateway_request_cannot_block_initial_provision(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_NORTH, 0));
+    rt_peer_new_gateway_request_t early = {0};
+    early.hag_networks[0] = NETWORK(0x0A600000, 0xFFE00000);
+    self.role.impl.on_peer_new_gateway_request(&self, &early);
+    CHECK(self.role.state.forwarder.global_state == GLOBAL_STATE_WITHOUT_NETWORK);
+    CHECK(!self.node_state.routing_table.count && !sibling_count);
+    CHECK(!self.role.state.forwarder.gateway_relay_pending);
+    rt_peer_handshake_t hello = {
+        .external_network = NETWORK(0x0A400000, 0xFFE00000),
+        .provided_network = NETWORK(0x0A440000, 0xFFFC0000), .dtr = 2,
+    };
+    self.role.impl.on_peer_handshake(&self, &hello);
+    CHECK(self.role.state.forwarder.node_network.addr == 0x0A440000);
+    CHECK(self.role.state.forwarder.dtr == 3 && network_change_count == 1);
+    CHECK(sibling_count == 1 && sibling_event.event_id == SIBL_PROVISION);
+    return 0;
+}
+
+EXPORT int test_better_gateway_still_replaces_live_parent_after_transit_request(void) {
+    reset_capture();
+    routing_t self;
+    CHECK(forwarder(&self, ORIENTATION_EAST, 4));
+    self.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    rt_peer_new_gateway_request_t request = {0};
+    request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    self.role.impl.on_peer_new_gateway_request(&self, &request);
+    rt_peer_new_gateway_response_t better = {
+        .external_network = NETWORK(0x0A440000, 0xFFFC0000), .dtr = 2,
+    };
+    self.role.impl.on_peer_new_gateway_response(&self, &better);
+    CHECK(self.role.state.forwarder.dtr == 3 && self.role.state.forwarder.is_local_root);
+    CHECK(self.node_state.routing_table.default_gateway == ORIENTATION_EAST);
+    CHECK(sibling_event.event_id == SIBL_NEW_GATEWAY_WINNER && sibling_count == 2);
+    CHECK(!self.role.state.forwarder.gateway_relay_pending && !peer_count);
+    return 0;
+}
+
+EXPORT int test_three_node_transit_confirmation_finishes_without_echo_or_reselection(void) {
+    reset_capture();
+    routing_t origin, middle_in, middle_out, root_in, root_other, root_center, origin_other;
+    CHECK(forwarder(&origin, ORIENTATION_NORTH, 3));
+    CHECK(forwarder(&middle_in, ORIENTATION_EAST, 2));
+    CHECK(forwarder(&middle_out, ORIENTATION_NORTH, 2));
+    CHECK(forwarder(&root_in, ORIENTATION_SOUTH, 1));
+    CHECK(forwarder(&root_other, ORIENTATION_WEST, 1));
+    CHECK(forwarder(&root_center, ORIENTATION_CENTER, 0));
+    CHECK(create_root_core(&root_center, 0x0A000000, 0xFF000000));
+    CHECK(forwarder(&origin_other, ORIENTATION_EAST, 3));
+    origin.role.state.forwarder.node_network = NETWORK(0x0A440000, 0xFFFC0000);
+    origin_other.role.state.forwarder.node_network = origin.role.state.forwarder.node_network;
+    origin.node_state.routing_table.default_gateway = 0;
+    middle_in.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    middle_out.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    middle_out.role.state.forwarder.is_local_root = true;
+    rt_sibl_send_new_gateway_request_t own = {0};
+    origin.role.impl.on_sibl_send_new_gateway_request(&origin, &own);
+    rt_peer_new_gateway_request_t path = peer_event.payload.new_gateway_request;
+    middle_in.role.impl.on_peer_new_gateway_request(&middle_in, &path);
+    rt_sibl_send_new_gateway_request_t relay = sibling_event.payload.send_new_gateway_request;
+    middle_out.role.impl.on_sibl_send_new_gateway_request(&middle_out, &relay);
+    path = peer_event.payload.new_gateway_request;
+    root_in.role.impl.on_peer_new_gateway_request(&root_in, &path);
+    relay = sibling_event.payload.send_new_gateway_request;
+    root_center.role.impl.on_sibl_send_new_gateway_request(&root_center, &relay);
+    root_center.role.impl.on_tick(&root_center, 10000);
+    rt_sibl_new_gateway_winner_t winner = sibling_event.payload.new_gateway_winner;
+    root_other.role.impl.on_sibl_new_gateway_winner(&root_other, &winner);
+    CHECK(peer_count == 2); /* root radio without a requester stays silent */
+    root_in.role.impl.on_sibl_new_gateway_winner(&root_in, &winner);
+    rt_peer_new_gateway_response_t reply = peer_event.payload.new_gateway_response;
+    middle_out.role.impl.on_peer_new_gateway_response(&middle_out, &reply);
+    CHECK(sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION);
+    rt_sibl_new_gateway_winner_t confirmed = sibling_event.payload.new_gateway_winner;
+    CHECK(middle_in.role.impl.on_sibl_gateway_confirmation);
+    middle_in.role.impl.on_sibl_gateway_confirmation(&middle_in, &confirmed);
+    reply = peer_event.payload.new_gateway_response;
+    origin.role.impl.on_peer_new_gateway_response(&origin, &reply);
+    CHECK(origin.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    origin_other.node_state.routing_table = origin.node_state.routing_table;
+    winner = sibling_event.payload.new_gateway_winner;
+    origin_other.role.impl.on_sibl_new_gateway_winner(&origin_other, &winner);
+    CHECK(peer_count == 4 && sibling_count == 5);
+    CHECK(middle_out.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(middle_out.role.state.forwarder.dtr == 2 && middle_out.role.state.forwarder.is_local_root);
+    CHECK(middle_in.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(middle_in.role.state.forwarder.dtr == 2);
+    CHECK(routing_table_route(&root_in.node_state.routing_table, 0x0A468002) == ORIENTATION_SOUTH);
+    CHECK(routing_table_route(&middle_in.node_state.routing_table, 0x0A468002) == ORIENTATION_EAST);
+    /* Replays and the descendant's delayed reply cannot start an echo chain. */
+    middle_in.role.impl.on_sibl_gateway_confirmation(&middle_in, &confirmed);
+    root_in.role.impl.on_sibl_new_gateway_winner(&root_in, &winner);
+    reply = (rt_peer_new_gateway_response_t){
+        .external_network = origin.role.state.forwarder.node_network, .dtr = 3,
+    };
+    middle_in.role.impl.on_peer_new_gateway_response(&middle_in, &reply);
+    CHECK(peer_count == 4 && sibling_count == 5);
+    CHECK(!network_change_count && !ap_enable_count && !panic_count && !mutex_errors);
+    return 0;
+}
+
+EXPORT int test_child_restart_cannot_replace_a_live_parent(void) {
+    reset_capture();
+    routing_t downstream, uplink;
+    CHECK(forwarder(&downstream, ORIENTATION_EAST, 2));
+    CHECK(forwarder(&uplink, ORIENTATION_NORTH, 2));
+    downstream.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    uplink.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    uplink.role.state.forwarder.is_local_root = true;
+    routing_table_add(&downstream.node_state.routing_table, 0x0A440000, 0xFFFC0000,
+                      ORIENTATION_EAST);
+    downstream.role.impl.on_peer_lost(&downstream, NULL);
+    CHECK(downstream.role.state.forwarder.dtr == 2);
+    CHECK(downstream.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(sibling_event.event_id == SIBL_SEND_NEW_GATEWAY_REQUEST);
+    rt_sibl_send_new_gateway_request_t relay = sibling_event.payload.send_new_gateway_request;
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay);
+    CHECK(uplink.role.state.forwarder.dtr == 2 && uplink.role.state.forwarder.is_local_root);
+    downstream.role.impl.on_peer_connected(&downstream, NULL);
+    rt_peer_handshake_t hello = {
+        .external_network = NETWORK(0x0A440000, 0xFFFC0000),
+        .provided_network = NETWORK(0x0A448000, 0xFFFF8000), .dtr = 3,
+    };
+    downstream.role.impl.on_peer_handshake(&downstream, &hello);
+    CHECK(downstream.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(downstream.role.state.forwarder.dtr == 2);
+    rt_peer_new_gateway_response_t confirmed = {
+        .external_network = NETWORK(0x0A000000, 0xFF000000), .dtr = 1,
+    };
+    uplink.role.impl.on_peer_new_gateway_response(&uplink, &confirmed);
+    CHECK(sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION);
+    rt_sibl_new_gateway_winner_t node_confirmation = sibling_event.payload.new_gateway_winner;
+    CHECK(downstream.role.impl.on_sibl_gateway_confirmation);
+    downstream.role.impl.on_sibl_gateway_confirmation(&downstream, &node_confirmation);
+    CHECK(downstream.role.state.forwarder.dtr == 2);
+    CHECK(downstream.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(peer_count == 2); /* uplink reannouncement and provider handshake */
+    CHECK(!network_change_count && !ap_enable_count && !panic_count);
+    return 0;
+}
+
+EXPORT int test_unknown_sibling_distance_cannot_steal_a_live_parent(void) {
+    reset_capture();
+    routing_t idle;
+    CHECK(forwarder(&idle, ORIENTATION_EAST, 2));
+    idle.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    idle.role.state.forwarder.dtr = 0;
+    idle.role.state.forwarder.global_state = GLOBAL_STATE_ON_GW_REQUEST;
+    rt_peer_handshake_t hello = {
+        .external_network = NETWORK(0x0A440000, 0xFFFC0000), .dtr = 3,
+    };
+    idle.role.impl.on_peer_handshake(&idle, &hello);
+    CHECK(idle.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(idle.role.state.forwarder.dtr == 0 && !sibling_count);
+    rt_sibl_new_gateway_winner_t confirmed = {
+        .network = idle.role.state.forwarder.node_network, .dtr = 2,
+    };
+    CHECK(idle.role.impl.on_sibl_gateway_confirmation);
+    idle.role.impl.on_sibl_gateway_confirmation(&idle, &confirmed);
+    CHECK(idle.role.state.forwarder.dtr == 2);
+    CHECK(idle.role.state.forwarder.global_state == GLOBAL_STATE_WITH_NETWORK);
+    CHECK(idle.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(!peer_count && !sibling_count);
+    return 0;
+}
+
+EXPORT int test_confirmation_dispatch_is_safe_for_root_center_and_home(void) {
+    for (unsigned root = 0; root < 2; ++root) {
+        reset_capture();
+        routing_t center;
+        CHECK(rt_create(&center, NULL, NULL, NULL, NULL, ORIENTATION_CENTER));
+        if (root) {
+            CHECK(rt_init_root(&center, 0x0A000000, 0xFF000000));
+        } else CHECK(rt_init_home(&center));
+        rt_on_start(&center);
+        critical_callback(critical_context);
+        rt_sibl_event_t event = {
+            .event_id = SIBL_GATEWAY_CONFIRMATION,
+            .payload.new_gateway_winner = {
+                .network = NETWORK(0x0A400000, 0xFFE00000), .dtr = 2,
+            },
+        };
+        CHECK(sizeof(event) == 144); /* new SPI path scope, coherent siblings */
+        CHECK(sizeof(rt_peer_event_t) == 132); /* Wi-Fi format stays unchanged */
+        routing_callback.callback(routing_callback.context, (const uint8_t *)&event, sizeof(event));
+        critical_callback(critical_context);
+        CHECK(!panic_count && !peer_count && !network_change_count && !ap_enable_count);
+    }
+    return 0;
+}
+
+EXPORT int test_selected_parent_distance_increase_requires_pending_confirmation(void) {
+    reset_capture();
+    routing_t uplink, downstream;
+    CHECK(forwarder(&uplink, ORIENTATION_NORTH, 2));
+    CHECK(forwarder(&downstream, ORIENTATION_EAST, 2));
+    uplink.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    downstream.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    uplink.role.state.forwarder.is_local_root = true;
+    rt_peer_new_gateway_response_t longer = {
+        .external_network = NETWORK(0x0A000000, 0xFF000000), .dtr = 3,
+    };
+    uplink.role.impl.on_peer_new_gateway_response(&uplink, &longer);
+    CHECK(uplink.role.state.forwarder.dtr == 2 && !sibling_count);
+    rt_peer_new_gateway_request_t child_request = {0};
+    child_request.hag_networks[0] = NETWORK(0x0A440000, 0xFFFC0000);
+    downstream.role.impl.on_peer_new_gateway_request(&downstream, &child_request);
+    rt_sibl_send_new_gateway_request_t relay = sibling_event.payload.send_new_gateway_request;
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay);
+    /* Its existing parent is still selected but now confirms a longer path. */
+    uplink.role.impl.on_peer_new_gateway_response(&uplink, &longer);
+    CHECK(sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION && sibling_count == 2);
+    CHECK(uplink.role.state.forwarder.dtr == 4 && uplink.role.state.forwarder.is_local_root);
+    CHECK(uplink.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    rt_sibl_new_gateway_winner_t confirmation = sibling_event.payload.new_gateway_winner;
+    CHECK(downstream.role.impl.on_sibl_gateway_confirmation);
+    downstream.role.impl.on_sibl_gateway_confirmation(&downstream, &confirmation);
+    CHECK(downstream.role.state.forwarder.dtr == 4);
+    CHECK(downstream.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(peer_event.event_id == PEER_NEW_GATEWAY_RESPONSE);
+    CHECK(peer_event.payload.new_gateway_response.dtr == 4);
+    CHECK(peer_count == 2 && !downstream.role.state.forwarder.gateway_relay_pending);
+    return 0;
+}
+
+EXPORT int test_four_nodes_confirm_only_forwarded_child_then_retry_other_return_path(void) {
+    reset_capture();
+    routing_t radio_a, radio_b, uplink, root_radio, root_center;
+    CHECK(forwarder(&radio_a, ORIENTATION_EAST, 2));
+    CHECK(forwarder(&radio_b, ORIENTATION_WEST, 2));
+    CHECK(forwarder(&uplink, ORIENTATION_NORTH, 2));
+    CHECK(forwarder(&root_radio, ORIENTATION_SOUTH, 1));
+    CHECK(forwarder(&root_center, ORIENTATION_CENTER, 0));
+    CHECK(create_root_core(&root_center, 0x0A000000, 0xFF000000));
+    radio_a.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    radio_b.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    uplink.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    uplink.role.state.forwarder.is_local_root = true;
+    /* Both children retained blocks outside their current parent's aggregate.
+     * A route to that parent therefore cannot stand in for either child. */
+    rt_peer_new_gateway_request_t request_a = {0}, request_b = {0};
+    request_a.hag_networks[0] = NETWORK(0x0A600000, 0xFFE00000);
+    request_b.hag_networks[0] = NETWORK(0x0A800000, 0xFFE00000);
+    radio_a.role.impl.on_peer_new_gateway_request(&radio_a, &request_a);
+    rt_sibl_send_new_gateway_request_t relay_a = sibling_event.payload.send_new_gateway_request;
+    radio_b.role.impl.on_peer_new_gateway_request(&radio_b, &request_b);
+    rt_sibl_send_new_gateway_request_t relay_b = sibling_event.payload.send_new_gateway_request;
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay_a);
+    rt_peer_new_gateway_request_t forwarded_a = peer_event.payload.new_gateway_request;
+    /* An A replay and B's concurrent request must not replace A's pending
+     * path or restart its deadline. Only A has crossed the Wi-Fi uplink. */
+    uplink.role.impl.on_tick(&uplink, 1000);
+    radio_a.role.impl.on_peer_new_gateway_request(&radio_a, &request_a);
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay_a);
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay_b);
+    CHECK(peer_count == 1 && uplink.role.state.forwarder.gateway_request_timeout == 29000);
+    root_radio.role.impl.on_peer_new_gateway_request(&root_radio, &forwarded_a);
+    rt_sibl_send_new_gateway_request_t root_request = sibling_event.payload.send_new_gateway_request;
+    root_center.role.impl.on_sibl_send_new_gateway_request(&root_center, &root_request);
+    root_center.role.impl.on_tick(&root_center, 10000);
+    rt_sibl_new_gateway_winner_t root_winner = sibling_event.payload.new_gateway_winner;
+    root_radio.role.impl.on_sibl_new_gateway_winner(&root_radio, &root_winner);
+    rt_peer_new_gateway_response_t reply = peer_event.payload.new_gateway_response;
+    uplink.role.impl.on_peer_new_gateway_response(&uplink, &reply);
+    CHECK(sibling_event.event_id == SIBL_GATEWAY_CONFIRMATION);
+    rt_sibl_new_gateway_winner_t confirmed_a = sibling_event.payload.new_gateway_winner;
+    CHECK(radio_a.role.impl.on_sibl_gateway_confirmation);
+    radio_a.role.impl.on_sibl_gateway_confirmation(&radio_a, &confirmed_a);
+    radio_b.role.impl.on_sibl_gateway_confirmation(&radio_b, &confirmed_a);
+    CHECK(peer_count == 3 && !radio_a.role.state.forwarder.gateway_relay_pending);
+    CHECK(radio_b.role.state.forwarder.gateway_relay_pending);
+    CHECK(routing_table_route(&root_radio.node_state.routing_table, 0x0A740002) == ORIENTATION_SOUTH);
+    CHECK(routing_table_route(&root_radio.node_state.routing_table, 0x0A940002) == ORIENTATION_CENTER);
+    radio_a.role.impl.on_sibl_gateway_confirmation(&radio_a, &confirmed_a);
+    radio_b.role.impl.on_sibl_gateway_confirmation(&radio_b, &confirmed_a);
+    root_radio.role.impl.on_sibl_new_gateway_winner(&root_radio, &root_winner);
+    CHECK(peer_count == 3); /* no duplicate response or false B confirmation */
+
+    /* B's normal retry can now travel upstream and install its return path. */
+    radio_b.role.impl.on_peer_new_gateway_request(&radio_b, &request_b);
+    relay_b = sibling_event.payload.send_new_gateway_request;
+    uplink.role.impl.on_sibl_send_new_gateway_request(&uplink, &relay_b);
+    CHECK(peer_count == 4);
+    rt_peer_new_gateway_request_t forwarded_b = peer_event.payload.new_gateway_request;
+    CHECK(forwarded_b.hag_networks[0].addr == request_b.hag_networks[0].addr);
+    root_radio.role.impl.on_peer_new_gateway_request(&root_radio, &forwarded_b);
+    root_request = sibling_event.payload.send_new_gateway_request;
+    root_center.role.impl.on_sibl_send_new_gateway_request(&root_center, &root_request);
+    root_center.role.impl.on_tick(&root_center, 10000);
+    root_winner = sibling_event.payload.new_gateway_winner;
+    root_radio.role.impl.on_sibl_new_gateway_winner(&root_radio, &root_winner);
+    reply = peer_event.payload.new_gateway_response;
+    uplink.role.impl.on_peer_new_gateway_response(&uplink, &reply);
+    rt_sibl_new_gateway_winner_t confirmed_b = sibling_event.payload.new_gateway_winner;
+    radio_a.role.impl.on_sibl_gateway_confirmation(&radio_a, &confirmed_b);
+    radio_b.role.impl.on_sibl_gateway_confirmation(&radio_b, &confirmed_b);
+    CHECK(peer_count == 6 && sibling_count == 10);
+    CHECK(!radio_b.role.state.forwarder.gateway_relay_pending);
+    CHECK(routing_table_route(&root_radio.node_state.routing_table, 0x0A940002) == ORIENTATION_SOUTH);
+    CHECK(uplink.role.state.forwarder.dtr == 2 && uplink.role.state.forwarder.is_local_root);
+    CHECK(uplink.node_state.routing_table.default_gateway == ORIENTATION_NORTH);
+    CHECK(!network_change_count && !ap_enable_count && !panic_count && !mutex_errors);
+    return 0;
+}
+
+EXPORT int test_confirmation_preserves_an_unrelated_outbound_request(void) {
+    reset_capture();
+    routing_t other_radio;
+    CHECK(forwarder(&other_radio, ORIENTATION_WEST, 2));
+    other_radio.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    rt_sibl_send_new_gateway_request_t request_b = {0};
+    request_b.hag_networks[0] = NETWORK(0x0A800000, 0xFFE00000);
+    other_radio.role.impl.on_sibl_send_new_gateway_request(&other_radio, &request_b);
+    rt_sibl_new_gateway_winner_t confirmed_a = {
+        .network = other_radio.role.state.forwarder.node_network, .dtr = 2,
+    };
+    confirmed_a.confirmed_path[0] = NETWORK(0x0A600000, 0xFFE00000);
+    confirmed_a.confirmed_path[1] = other_radio.role.state.forwarder.node_network;
+    CHECK(other_radio.role.impl.on_sibl_gateway_confirmation);
+    other_radio.role.impl.on_sibl_gateway_confirmation(&other_radio, &confirmed_a);
+    CHECK(other_radio.role.state.forwarder.gateway_request_timeout == 30000 && peer_count == 1);
+    rt_sibl_new_gateway_winner_t confirmed_b = confirmed_a;
+    confirmed_b.confirmed_path[0] = request_b.hag_networks[0];
+    other_radio.role.impl.on_sibl_gateway_confirmation(&other_radio, &confirmed_b);
+    CHECK(other_radio.role.state.forwarder.gateway_request_timeout == 0 && peer_count == 1);
+    return 0;
+}
+
+EXPORT int test_unsolicited_improvement_does_not_confirm_an_unforwarded_child_path(void) {
+    reset_capture();
+    routing_t candidate, downstream;
+    CHECK(forwarder(&candidate, ORIENTATION_EAST, 4));
+    CHECK(forwarder(&downstream, ORIENTATION_WEST, 4));
+    candidate.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    downstream.node_state.routing_table.default_gateway = ORIENTATION_NORTH;
+    rt_peer_new_gateway_request_t child_request = {0};
+    child_request.hag_networks[0] = NETWORK(0x0A800000, 0xFFE00000);
+    downstream.role.impl.on_peer_new_gateway_request(&downstream, &child_request);
+    /* This alternate advertises a shorter route without a corresponding
+     * outbound NGR; it may win, but cannot confirm the child's missing path. */
+    rt_peer_new_gateway_response_t improved = {
+        .external_network = NETWORK(0x0A600000, 0xFFE00000), .dtr = 2,
+    };
+    candidate.role.impl.on_peer_new_gateway_response(&candidate, &improved);
+    CHECK(candidate.node_state.routing_table.default_gateway == ORIENTATION_EAST);
+    CHECK(candidate.role.state.forwarder.dtr == 3);
+    CHECK(sibling_event.event_id == SIBL_NEW_GATEWAY_WINNER);
+    rt_sibl_new_gateway_winner_t winner = sibling_event.payload.new_gateway_winner;
+    CHECK(!winner.confirmed_path[0].addr);
+    downstream.node_state.routing_table = candidate.node_state.routing_table;
+    downstream.role.impl.on_sibl_new_gateway_winner(&downstream, &winner);
+    CHECK(!peer_count && downstream.role.state.forwarder.gateway_relay_pending);
+    CHECK(downstream.role.state.forwarder.dtr == 3);
     return 0;
 }

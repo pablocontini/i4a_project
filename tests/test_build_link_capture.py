@@ -1,4 +1,7 @@
 import importlib.util
+import argparse
+from contextlib import redirect_stderr
+import io
 from pathlib import Path
 import sys
 import unittest
@@ -11,6 +14,47 @@ spec.loader.exec_module(build)
 
 
 class DiagnosticBuildTests(unittest.TestCase):
+    def test_existing_variants_keep_their_ssid_and_manifest_identity(self):
+        for variant in ("grillo", "ramona"):
+            with self.subTest(variant=variant):
+                _, args = build.parse_arguments(["--variant", variant])
+                self.assertEqual(args.variant, variant)
+                self.assertEqual(args.ssid, "ComNetAR - " + variant.capitalize())
+
+    def test_custom_ssid_keeps_its_name_and_uses_custom_manifest_identity(self):
+        _, args = build.parse_arguments([
+            "--ssid", "ComNetAR - Nodo del patio", "--output", "firmware/patio"])
+        self.assertEqual(args.variant, "custom")
+        self.assertEqual(args.ssid, "ComNetAR - Nodo del patio")
+        self.assertEqual(args.output, Path("firmware/patio"))
+
+    def test_identity_selection_is_required_and_exclusive(self):
+        for argv in ([], ["--variant", "grillo", "--ssid", "Otro nodo"]):
+            with self.subTest(argv=argv), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    build.parse_arguments(argv)
+                self.assertEqual(error.exception.code, 2)
+
+    def test_ssid_accepts_normal_names_and_checks_utf8_byte_length(self):
+        for value in ("A", "a" * 31, "ComNetAR - Casa de José", "é" * 15 + "a",
+                      "Nodo 'El patio'", "Nodo (Norte)"):
+            with self.subTest(value=value):
+                self.assertEqual(build.validate_ssid(value), value)
+        for value in ("", "a" * 32, "é" * 16, "\ud800"):
+            with self.subTest(value=repr(value)):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    build.validate_ssid(value)
+
+    def test_ssid_rejects_controls_and_cmake_or_c_string_escapes(self):
+        for suffix in ("\0", "\n", "\r", "\t", "\x1b", "\x7f", "\x85",
+                       '"', "\\", ";", "$<CONFIG:Debug>"):
+            with self.subTest(suffix=repr(suffix)), redirect_stderr(io.StringIO()):
+                with self.assertRaises(argparse.ArgumentTypeError):
+                    build.validate_ssid("Nodo" + suffix)
+                with self.assertRaises(SystemExit) as error:
+                    build.parse_arguments(["--ssid", "Nodo" + suffix])
+                self.assertEqual(error.exception.code, 2)
+
     def test_enabling_diagnostics_preserves_flash_wifi_and_timing_settings(self):
         original = ("CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y\nCONFIG_LOG_DEFAULT_LEVEL_NONE=y\n"
                     "# CONFIG_I4A_CAPTURE_DIAGNOSTICS is not set\nCONFIG_LWIP_TCPIP_TASK_STACK_SIZE=3072\n")

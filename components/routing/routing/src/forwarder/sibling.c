@@ -65,8 +65,7 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
     if (state->dtr == 1)
         return;  // I am root
 
-    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST &&
-        state->gateway_request_timeout != 0) {
+    if (state->gateway_request_timeout != 0) {
         rt_gw_trace(self, RT_GW_DECISION, RT_GW_PENDING, 0, event->hag_networks, 16);
         return;
     }  // An outstanding request already has a retry deadline.
@@ -90,9 +89,11 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
         return;
     }
 
-    state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
-    state->dtr = 0;
-    state->is_local_root = false;
+    if (rt_fwd_default_missing(self)) {
+        state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
+        state->dtr = 0;
+        state->is_local_root = false;
+    }
     *hag_network = state->node_network;
     memcpy(state->gateway_request_path, peer_event.payload.new_gateway_request.hag_networks,
            sizeof(state->gateway_request_path));
@@ -103,21 +104,57 @@ static void on_send_new_gateway_request(routing_t *self, const rt_sibl_send_new_
         peer_event.payload.new_gateway_request.hag_networks, 16);
 }
 
+static bool confirmed_path_covers(const network_t requested[16], const network_t confirmed[16]) {
+    if (!requested[0].addr) return false;
+    for (size_t i = 0; i < 16 && requested[i].addr; ++i) {
+        if (requested[i].addr != confirmed[i].addr || requested[i].mask != confirmed[i].mask)
+            return false;
+    }
+    return true;
+}
+
+static void reply_pending_gateway(routing_t *self, uint32_t dtr, const network_t confirmed_path[16]) {
+    rt_forwarder_state_t *state = GET_STATE(self);
+    if (!state->gateway_relay_pending || state->local_state != LOCAL_STATE_CONNECTED ||
+        !confirmed_path_covers(state->gateway_relay_path, confirmed_path))
+        return;
+    rt_peer_event_t response = {
+        .event_id = PEER_NEW_GATEWAY_RESPONSE,
+        .payload.new_gateway_response = {
+            .dtr = dtr, .external_network = state->node_network,
+        },
+    };
+    bool sent = wl_send_peer_message(self->deps.wl, &response, sizeof(response));
+    rt_gw_trace(self, RT_GW_RESPONSE_TX, RT_GW_OK, sent, NULL, 0);
+    if (sent) state->gateway_relay_pending = false;
+}
+
+static void on_gateway_confirmation(routing_t *self, const rt_sibl_new_gateway_winner_t *event) {
+    rt_forwarder_state_t *state = GET_STATE(self);
+    if (!node_network_is_valid(&state->node_network, self->orientation) ||
+        !event->dtr || event->dtr == UINT32_MAX || rt_fwd_default_missing(self) ||
+        event->network.addr != state->node_network.addr ||
+        event->network.mask != state->node_network.mask)
+        return;
+    /* Confirmation serves pending peers, not a new election. Synchronize the
+     * actual distance of the already selected parent, which may itself have
+     * switched to a longer path; neither the output nor its owner changes. */
+    if (state->dtr == 0) state->is_local_root = false;
+    state->dtr = event->dtr;
+    state->global_state = GLOBAL_STATE_WITH_NETWORK;
+    if (confirmed_path_covers(state->gateway_request_path, event->confirmed_path))
+        state->gateway_request_timeout = 0;
+    reply_pending_gateway(self, event->dtr, event->confirmed_path);
+}
+
 static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_winner_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
     if (!node_network_is_valid(&state->node_network, self->orientation)) return;
 
     if (state->dtr == 1) {  // I'm root
-        rt_peer_event_t peer_event = {
-            .event_id = PEER_NEW_GATEWAY_RESPONSE,
-            .payload.new_gateway_response = {
-                .dtr = state->dtr,
-                .external_network = state->node_network,
-            },
-        };
-
-        bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
-        rt_gw_trace(self, RT_GW_RESPONSE_TX, RT_GW_OK, sent, NULL, 0);
+        /* Root installed every network in this radio's received NGR before
+         * asking its center for a response. It can answer that exact path. */
+        reply_pending_gateway(self, state->dtr, state->gateway_relay_path);
         return;
     }
 
@@ -125,18 +162,10 @@ static void on_new_gateway_winner(routing_t *self, const rt_sibl_new_gateway_win
     state->is_local_root = false;
     // The winning interface already counted the wireless hop for this node.
     state->dtr = event->dtr;
-    state->gateway_request_timeout = 0;
+    if (confirmed_path_covers(state->gateway_request_path, event->confirmed_path))
+        state->gateway_request_timeout = 0;
 
-    rt_peer_event_t peer_event = {
-            .event_id = PEER_NEW_GATEWAY_RESPONSE,
-            .payload.new_gateway_response = {
-                .dtr = state->dtr,
-                .external_network = state->node_network,
-            },
-        };
-
-    bool sent=wl_send_peer_message(self->deps.wl, &peer_event, sizeof(peer_event));
-    rt_gw_trace(self, RT_GW_RESPONSE_TX, RT_GW_OK, sent, NULL, 0);
+    reply_pending_gateway(self, state->dtr, event->confirmed_path);
 }
 
 void rt_fwd_sibl_set_required_callbacks(rt_role_impl_t *impl) {
@@ -144,4 +173,5 @@ void rt_fwd_sibl_set_required_callbacks(rt_role_impl_t *impl) {
     impl->on_sibl_provision = on_provision;
     impl->on_sibl_send_new_gateway_request = on_send_new_gateway_request;
     impl->on_sibl_new_gateway_winner = on_new_gateway_winner;
+    impl->on_sibl_gateway_confirmation = on_gateway_confirmation;
 }

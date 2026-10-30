@@ -104,6 +104,11 @@ typedef struct rt_forwarder_state {
     network_t gateway_request_path[16];
     uint32_t gateway_request_timeout;
 
+    /* A peer on this radio asked for root confirmation. This is independent
+     * of our own selected gateway: serving a child must not withdraw it. */
+    bool gateway_relay_pending;
+    network_t gateway_relay_path[16];
+
     /* Nonzero while the initial sibling provision still lacks a ring ACK.
      * Pause retries while this device is not a usable provider. */
     uint32_t provision_retry_timeout;
@@ -145,6 +150,9 @@ typedef struct rt_sibl_send_new_gateway_request {
 typedef struct rt_sibl_new_gateway_winner {
     network_t network;
     uint32_t dtr;
+    /* Local SPI scope of the outbound NGR that elicited a peer response.
+     * Wi-Fi responses have no transaction ID; keep their wire format intact. */
+    network_t confirmed_path[16];
 } rt_sibl_new_gateway_winner_t;
 
 typedef struct rt_sibl_event {
@@ -154,6 +162,7 @@ typedef struct rt_sibl_event {
         SIBL_PROVISION,
         SIBL_SEND_NEW_GATEWAY_REQUEST,
         SIBL_NEW_GATEWAY_WINNER,
+        SIBL_GATEWAY_CONFIRMATION,
     } event_id;
     union {
         rt_sibl_update_dtr_t update_dtr;
@@ -194,6 +203,7 @@ typedef struct rt_role_impl {
     void (*on_sibl_provision)(struct routing *self, const rt_sibl_provision_t *event);
     void (*on_sibl_send_new_gateway_request)(struct routing *self, const rt_sibl_send_new_gateway_request_t *event);
     void (*on_sibl_new_gateway_winner)(struct routing *self, const rt_sibl_new_gateway_winner_t *event);
+    void (*on_sibl_gateway_confirmation)(struct routing *self, const rt_sibl_new_gateway_winner_t *event);
 } rt_role_impl_t;
 
 #endif  // _I4A_rt_role_IMPL_H_

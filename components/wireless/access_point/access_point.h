@@ -27,6 +27,9 @@ struct AccessPoint {
   bool initialized;
   bool is_center;
   bool server_is_up;
+  bool peer_associated;
+  uint8_t peer_mac[6];
+  uint8_t peer_aid;
   bool stopping;
   bool is_apsta;
   AccessPoint_State state;

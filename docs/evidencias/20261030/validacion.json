@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-30",
+  "branch": "fix/stable-links-neighbor-restart",
+  "base_commit": "19ed090b8d1047051fcc577e2726805abda761b5",
+  "hardware_test": false,
+  "native_c": {
+    "routing": 51,
+    "neighbor_manager": 38,
+    "ota": 24,
+    "wireless": 7,
+    "routing_hooks": 5,
+    "access_point": 7,
+    "peer_renew": 9
+  },
+  "python_unittest": 80,
+  "status": "all_passed",
+  "routing_original_failed": 14,
+  "routing_original_new_cases": 15,
+  "peer_renew_original_failed": 5,
+  "peer_renew_original_cases": 9,
+  "ap_original": "first_case_fails_on_unrelated_disconnect",
+  "spi_routing_event_bytes": 144,
+  "wifi_peer_event_bytes": 132,
+  "wireless_protocol_limit": "No request ID in existing gateway response; SPI path scoping cannot correlate an old reply after a new request begins.",
+  "diff_whitespace_check": "Passed with CRLF-aware whitespace rules, preserving existing repository CRLF files."
+}

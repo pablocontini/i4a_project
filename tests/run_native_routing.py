@@ -41,6 +41,21 @@ def main():
     native = ctypes.CDLL(str(library))
     failures = []
     for name in (
+        "test_transit_request_preserves_working_parent_and_distance",
+        "test_transit_retry_preserves_live_uplink_and_original_deadline",
+        "test_confirmation_answers_pending_child_once_without_reelection",
+        "test_pending_confirmation_survives_failed_peer_send",
+        "test_unsolicited_gateway_winner_does_not_reply_to_parent",
+        "test_early_peer_gateway_request_cannot_block_initial_provision",
+        "test_better_gateway_still_replaces_live_parent_after_transit_request",
+        "test_three_node_transit_confirmation_finishes_without_echo_or_reselection",
+        "test_child_restart_cannot_replace_a_live_parent",
+        "test_unknown_sibling_distance_cannot_steal_a_live_parent",
+        "test_confirmation_dispatch_is_safe_for_root_center_and_home",
+        "test_selected_parent_distance_increase_requires_pending_confirmation",
+        "test_four_nodes_confirm_only_forwarded_child_then_retry_other_return_path",
+        "test_confirmation_preserves_an_unrelated_outbound_request",
+        "test_unsolicited_improvement_does_not_confirm_an_unforwarded_child_path",
         "test_gateway_trace_records_request_retry_and_winner_without_changing_deadlines",
         "test_gateway_trace_is_bounded_and_preserves_event_order",
         "test_moved_block_is_not_redelegated_to_a_new_node",

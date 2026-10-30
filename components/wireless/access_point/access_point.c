@@ -44,6 +44,9 @@ void ap_init(AccessPointPtr ap, uint8_t wifi_channel, const char *wifi_ssid, con
   ap->channel = wifi_channel;
   ap->is_center = is_center;
   ap->server_is_up = false;
+  ap->peer_associated = false;
+  memset(ap->peer_mac, 0, sizeof(ap->peer_mac));
+  ap->peer_aid = 0;
   ap->stopping = false;
   ap->is_apsta = is_apsta;
   ap->initialized = true;
@@ -169,31 +172,58 @@ void ap_destroy_netif(AccessPointPtr ap) {
   }
 }
 
+/* Reject only the new association. AID zero disconnects every AP station. */
+static void ap_reject_association(AccessPointPtr ap, uint8_t aid) {
+  if (!aid || ap->state != active || ap->stopping) return;
+  esp_err_t result = esp_wifi_deauth_sta(aid);
+  if (result != ESP_OK)
+    ESP_LOGW(LOGGING_TAG, "Cannot reject AP station aid=%u: %s", aid, esp_err_to_name(result));
+}
+
 void ap_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
   AccessPointPtr ap = (AccessPointPtr)arg;
   if (event_base == WIFI_EVENT) {
     switch (event_id) {
 
-      case WIFI_EVENT_AP_STACONNECTED:
-        if (ap->stopping) break;
+      case WIFI_EVENT_AP_STACONNECTED: {
+        const wifi_event_ap_staconnected_t *event = event_data;
+        if (ap->stopping || !event) break;
         if (!node_is_ap_locked()) {
           if (!ap->is_center && !ap->server_is_up) {
+            memcpy(ap->peer_mac, event->mac, sizeof(ap->peer_mac));
+            ap->peer_aid = event->aid;
+            ap->peer_associated = true;
             server_create();
             ap->server_is_up = true;
+          } else if (!ap->is_center && ap->peer_associated &&
+                     !memcmp(ap->peer_mac, event->mac, sizeof(ap->peer_mac))) {
+            ap->peer_aid = event->aid;
+          } else if (!ap->is_center && ap->peer_associated &&
+                     memcmp(ap->peer_mac, event->mac, sizeof(ap->peer_mac))) {
+            /* The lateral server has one session, even if AP capacity changes. */
+            ESP_LOGW(LOGGING_TAG, "AP peer occupied; rejecting new station aid=%u", event->aid);
+            ap_reject_association(ap, event->aid);
           }
         } else {
           ESP_LOGW(LOGGING_TAG, "AP is locked");
-          ap_disconnect_all_stations(ap);
+          ap_reject_association(ap, event->aid);
         }
 
         break;
+      }
 
-      case WIFI_EVENT_AP_STADISCONNECTED:
-        if (ap->server_is_up) {
+      case WIFI_EVENT_AP_STADISCONNECTED: {
+        const wifi_event_ap_stadisconnected_t *event = event_data;
+        /* Another station leaving must not tear down the admitted peer. */
+        if (event && ap->server_is_up && ap->peer_associated &&
+            event->aid == ap->peer_aid &&
+            !memcmp(ap->peer_mac, event->mac, sizeof(ap->peer_mac))) {
+          ap->peer_associated = false;
           server_close();
           ap->server_is_up = false;
         }
         break;
+      }
 
     }
   }

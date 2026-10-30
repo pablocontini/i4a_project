@@ -1,0 +1,3 @@
+test_unrelated_disconnect_preserves_peer failed: 71
+
+Baseline exit: 1

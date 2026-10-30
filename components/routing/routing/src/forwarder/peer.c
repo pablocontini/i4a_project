@@ -10,9 +10,23 @@
 
 static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event);
 
+static bool is_selected_gateway(routing_t *self) {
+    bool selected = false;
+    WITH_LOCK(&self->node_state.m_lock, {
+        selected = self->node_state.routing_table.default_gateway == self->orientation;
+    });
+    return selected;
+}
+
 static bool should_adopt_gateway(routing_t *self, uint32_t candidate_dtr) {
     uint32_t current_dtr = GET_STATE(self)->dtr;
-    if (current_dtr == 0 || candidate_dtr < current_dtr) return true;
+    if (current_dtr == 0) {
+        /* An idle/stale sibling may lack the node's DTR while another radio
+         * still owns a working default. Unknown distance is not permission to
+         * replace that parent with an arbitrary child advertisement. */
+        return rt_fwd_default_missing(self) || is_selected_gateway(self);
+    }
+    if (candidate_dtr < current_dtr) return true;
     if (candidate_dtr != current_dtr) return false;
 
     /* An idle sibling can retain its old DTR after the shared table loses
@@ -141,6 +155,7 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
         state->is_local_root = true;
         state->global_state = GLOBAL_STATE_WITH_NETWORK;
         state->gateway_request_timeout = 0;
+        state->gateway_relay_pending = false;
         add_global_route(self, &NETWORK(0, 0), self->orientation);
 
         rt_sibl_event_t event = {
@@ -153,6 +168,13 @@ static void on_update_dtr(routing_t *self, const rt_peer_update_dtr_t *event) {
 
 static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_request_t *event) {
     rt_forwarder_state_t *state = GET_STATE(self);
+
+    /* A control request cannot replace initial provisioning. In particular,
+     * an early NGR must not move WITHOUT_NETWORK into a recovery state. */
+    if (!node_network_is_valid(&state->node_network, self->orientation)) {
+        rt_gw_trace(self, RT_GW_DECISION, RT_GW_NO_NETWORK, 0, event->hag_networks, 16);
+        return;
+    }
 
     /* A repeated path must not install a route to this node through a peer. */
     for (size_t i = 0; i < sizeof(event->hag_networks) / sizeof(event->hag_networks[0]); ++i) {
@@ -184,19 +206,12 @@ static void on_new_gateway_request(routing_t *self, const rt_peer_new_gateway_re
     );
     memcpy(&sibl_event.payload.send_new_gateway_request.hag_networks, event->hag_networks, sizeof(event->hag_networks));
 
-    if (state->dtr == 1) {
-        // I am root
-        rs_broadcast(self->deps.rs, RS_ROUTING, &sibl_event, sizeof(sibl_event));
-        return;
-    }
-
-    if (state->global_state == GLOBAL_STATE_ON_GW_REQUEST) {
-        rt_gw_trace(self, RT_GW_DECISION, RT_GW_ALREADY_PENDING, 0, event->hag_networks, 16);
-        return;
-    }
-
-    state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
-    state->dtr = 0;
+    /* The request belongs to this peer, not necessarily to this node. Keep a
+     * working parent and its distance while arranging confirmation upstream.
+     * Replays may retry a lost SPI publication; outbound radios retain their
+     * original retry deadline, and Root retains its response deadline. */
+    state->gateway_relay_pending = true;
+    memcpy(state->gateway_relay_path, event->hag_networks, sizeof(state->gateway_relay_path));
     rs_broadcast(self->deps.rs, RS_ROUTING, &sibl_event, sizeof(sibl_event));
 }
 
@@ -221,14 +236,36 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
 
     if (!should_adopt_gateway(self, candidate_dtr)) {
         rt_gw_trace(self, RT_GW_DECISION, RT_GW_NOT_BETTER, peer_dtr, NULL, 0);
-        // Keep a working gateway at equal distance; reject worse candidates.
+        /* Only the selected, working uplink can confirm a transit request
+         * without winning an election. Delayed replies from a child or an
+         * unused alternate neither change our parent nor generate replies. */
+        if (is_selected_gateway(self) && state->dtr > 1 && state->gateway_request_timeout) {
+            /* The same parent may itself have recovered through a longer
+             * path. Its solicited confirmation updates our real distance,
+             * while the selected output remains unchanged. */
+            state->dtr = candidate_dtr;
+            rt_sibl_event_t confirmation = {
+                .event_id = SIBL_GATEWAY_CONFIRMATION,
+                .payload.new_gateway_winner = {
+                    .dtr = state->dtr, .network = state->node_network,
+                },
+            };
+            memcpy(confirmation.payload.new_gateway_winner.confirmed_path,
+                   state->gateway_request_path, sizeof(state->gateway_request_path));
+            if (rs_broadcast(self->deps.rs, RS_ROUTING, &confirmation, sizeof(confirmation)))
+                state->gateway_request_timeout = 0;
+        }
         return;
     }
 
+    bool requested = state->gateway_request_timeout != 0;
     state->global_state = GLOBAL_STATE_WITH_NETWORK;
     state->is_local_root = true;
     state->dtr = candidate_dtr;
     state->gateway_request_timeout = 0;
+    /* This peer is now our parent. Never answer its earlier request by
+     * advertising a path that has just been selected through that same peer. */
+    state->gateway_relay_pending = false;
     rt_gw_trace(self, RT_GW_DECISION, RT_GW_ADOPT, peer_dtr, NULL, 0);
 
     add_global_route(self, &NETWORK(0, 0), self->orientation);
@@ -237,6 +274,11 @@ static void on_new_gateway_response(routing_t *self, const rt_peer_new_gateway_r
         .payload.new_gateway_winner.dtr = state->dtr,
         .payload.new_gateway_winner.network = event->external_network,
     };
+    /* An unsolicited improvement is not proof that any pending child's
+     * return path was forwarded. Only scope replies to our actual request. */
+    if (requested)
+        memcpy(sibl_event.payload.new_gateway_winner.confirmed_path,
+               state->gateway_request_path, sizeof(state->gateway_request_path));
     rs_broadcast(self->deps.rs, RS_ROUTING, &sibl_event, sizeof(sibl_event));
 }
 
@@ -246,17 +288,20 @@ static void on_peer_lost(routing_t *self, const network_t *connection) {
     rt_forwarder_state_t *state = GET_STATE(self);
 
     state->local_state = LOCAL_STATE_NOT_CONNECTED;
+    state->gateway_request_timeout = 0;
+    state->gateway_relay_pending = false;
     remove_routes_by_output(self, self->orientation);
 
     /* A lost redundant link can remove the upstream node's return route even
      * when this radio was no longer the default gateway. Reannounce the path
      * through the surviving radios in that case as well. */
     if (state->is_local_root || state->dtr > 1) {
-        log_info(TAG, "[peer_lost] Connection to ROOT node has been lost");
+        log_info(TAG, "[peer_lost] Peer disconnected; refreshing return paths");
         state->is_local_root = false;
-        state->dtr = 0;
-        state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
-        state->gateway_request_timeout = 0;
+        if (rt_fwd_default_missing(self)) {
+            state->dtr = 0;
+            state->global_state = GLOBAL_STATE_ON_GW_REQUEST;
+        }
         rt_sibl_event_t sibl_event = {
             .event_id = SIBL_SEND_NEW_GATEWAY_REQUEST,
         };

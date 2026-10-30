@@ -85,12 +85,43 @@ def capture_config(text):
     return "\n".join(lines) + "\nCONFIG_I4A_CAPTURE_DIAGNOSTICS=y\n"
 
 
-def main():
+def validate_ssid(value):
+    try:
+        length = len(value.encode("utf-8"))
+    except UnicodeEncodeError as exc:
+        raise argparse.ArgumentTypeError("SSID must be valid UTF-8") from exc
+    # Device/AccessPoint keep SSIDs in 32-byte, NUL-terminated arrays.
+    if not 1 <= length <= 31:
+        raise argparse.ArgumentTypeError("SSID must contain 1 to 31 UTF-8 bytes")
+    # The value becomes a CMake compile definition containing a C string.
+    # Reject characters that can escape that string/list or start a generator
+    # expression; subprocess itself is always invoked without a shell.
+    if any(ord(char) < 0x20 or 0x7F <= ord(char) <= 0x9F or
+           char in '\"\\;$' for char in value):
+        raise argparse.ArgumentTypeError(
+            "SSID cannot contain controls, double quotes, backslashes, semicolons or dollar signs")
+    return value
+
+
+def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--variant", choices=("ramona", "grillo"), required=True)
+    identity = parser.add_mutually_exclusive_group(required=True)
+    identity.add_argument("--variant", choices=("ramona", "grillo"),
+                          help="Use the existing ComNetAR - Ramona/Grillo SSID")
+    identity.add_argument("--ssid", type=validate_ssid,
+                          help="Custom house Wi-Fi SSID (1 to 31 UTF-8 bytes)")
     parser.add_argument("--base-sdkconfig", type=Path, default=ROOT / "app/sdkconfig")
     parser.add_argument("--output", type=Path)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if args.ssid is None:
+        args.ssid = "ComNetAR - " + args.variant.capitalize()
+    else:
+        args.variant = "custom"
+    return parser, args
+
+
+def main():
+    parser, args = parse_arguments()
     work = ROOT / "app/build/link-capture"
     output = (args.output or work / args.variant).resolve()
     if output.exists():
@@ -114,7 +145,7 @@ def main():
         contents = capture_config(args.base_sdkconfig.read_text(encoding="utf-8"))
         if not sdkconfig.exists() or sdkconfig.read_text(encoding="utf-8") != contents:
             sdkconfig.write_text(contents, encoding="utf-8")
-        ssid = "ComNetAR - " + args.variant.capitalize()
+        ssid = args.ssid
         build = work / "build"
         command = [python, str(Path(env["IDF_PATH"]) / "tools/idf.py"), "-C", str(ROOT / "app"),
                    "-B", str(build), "-D", "SDKCONFIG=" + str(sdkconfig),

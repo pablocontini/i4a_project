@@ -11,6 +11,7 @@
 #define HELLO_VERSION 2
 #define IO_TIMEOUT_MS 5000
 #define RENEW_MS 5000
+#define RENEW_RETRY_MS 1000
 
 static uint64_t now_ms(void) { return (uint64_t)esp_timer_get_time() / 1000; }
 
@@ -65,9 +66,18 @@ static bool read_exact(peer_session_t *session, uint8_t *data, unsigned len, boo
         if (!idle && now >= deadline) return false;
         if (session->admitted) {
             if (!nm_owns(&session->link)) return false;
-            if (now - session->renewed_ms >= RENEW_MS) {
-                if (!nm_renew(&session->link)) return false;
-                session->renewed_ms = now_ms();
+            if (now - session->renewed_ms >= RENEW_MS &&
+                now >= session->renew_retry_at_ms) {
+                bool renewed = nm_renew(&session->link);
+                uint64_t completed = now_ms();
+                /* A missed SPI reply is not revocation. Keep the socket only
+                 * while the shared registry still grants this exact session.
+                 * Back off from RPC completion, including immediate failures;
+                 * never extend the registry's lease using a local timer. */
+                session->renew_retry_at_ms = completed + (renewed ? RENEW_MS : RENEW_RETRY_MS);
+                if (renewed) session->renewed_ms = completed;
+                if (!usable(session) || !nm_owns(&session->link)) return false;
+                if (!idle && completed >= deadline) return false;
             }
         }
         fd_set readers;
@@ -179,6 +189,7 @@ bool peer_session_open(peer_session_t *session, int sock, bool station, const ch
         started = session->admitted;
     });
     session->renewed_ms = now_ms();
+    session->renew_retry_at_ms = session->renewed_ms + RENEW_MS;
     return started;
 }
 
