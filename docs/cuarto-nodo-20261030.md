@@ -153,23 +153,27 @@ python tests/run_native_peer_renew.py --cc app/build/tools/tcc/tcc.exe
 python tests/run_native_access_point.py --cc app/build/tools/tcc/tcc.exe
 ```
 
-La compilación ESP32 con ESP-IDF 5.4.1 terminó correctamente. Se generó el
-paquete diagnóstico local `app/build/cuarto-nodo-20261030/grillo`, con
-`main.bin` de 908 016 bytes, dentro de la partición OTA de 2 031 616 bytes.
-Su identidad ELF es
-`5547aef3d8bc9265723f2d146309e765c7907a9f8198086815130a15f7feb350`.
+La compilación ESP32 con ESP-IDF 5.4.1 terminó correctamente. Para compartir
+se recompilaron las variantes Grillo y Ramona desde el commit de código
+`5c268f3f7ddb9cf2a6edb6a701f169204bcc56f4`; ambas tienen `main.bin` de
+908 016 bytes, dentro de la partición OTA de 2 031 616 bytes.
+Se incluyen en [firmware/validacion-20261030](../firmware/validacion-20261030/README.md)
+con versión de aplicación `5c268f3` y un manifiesto por variante.
+
 Se verificaron el hash binario, la identidad ELF y que el archivo de fuentes
-del paquete coincide byte a byte con las fuentes de producción del checkout.
-El [manifiesto de compilación](evidencias/20261030/compilacion.json) conserva
-los hashes. Se validó la variante Grillo; no se generaron paquetes específicos
-para los demás nodos en esta sesión.
+de cada compilación coincide byte a byte con las fuentes de producción del
+checkout. La [evidencia de publicación](evidencias/20261030/publicacion.json)
+conserva el commit y los hashes de las dos imágenes compartidas. El
+[manifiesto inicial](evidencias/20261030/compilacion.json) pertenece a la
+primera compilación de revisión anterior al commit; para la actualización
+usar los hashes de los binarios compartidos, no los de esa revisión inicial.
 
 El mensaje de routing SPI pasa de 132 a 144 bytes y agrega una confirmación
 interna. **Hay que actualizar juntas las cinco placas de cada nodo** mediante
 el procedimiento coordinado: los mensajes antiguos de routing SPI son
 incompatibles dentro de un mismo nodo. Se mantienen los mensajes Wi-Fi entre
 nodos de 132 bytes y HELLO versión 2. No se ha cargado firmware ni realizado
-una prueba física en esta sesión. La corrección se prepara para compartir en
+una prueba física en esta sesión. La corrección y sus binarios se comparten en
 la rama `fix/stable-links-neighbor-restart`, junto con la
 [guía de actualización y validación](ota-validacion-cuarto-nodo-20261030.md).
 

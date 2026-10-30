@@ -1,0 +1,47 @@
+{
+  "branch": "fix/stable-links-neighbor-restart",
+  "source_commit": "5c268f3f7ddb9cf2a6edb6a701f169204bcc56f4",
+  "native_c_tests_passed": 141,
+  "python_tests_passed": 80,
+  "hardware_validation_pending": true,
+  "images": {
+    "grillo": {
+      "built_utc": "2026-10-30T18:46:32.374863+00:00",
+      "variant": "grillo",
+      "ssid": "ComNetAR - Grillo",
+      "diagnostics": true,
+      "main_bin_sha256": "338c9aa2f398b063907f17a9a9580edcb20043ba68791ecd8a495bbeeb5e7874",
+      "size": 908016,
+      "elf_sha256_reported_by_firmware": "be2151bc684d45b093dba7dfabd1f08ef1d3dd740ee1a4b67e3d75f8dd63b47e",
+      "source_commit": "5c268f3f7ddb9cf2a6edb6a701f169204bcc56f4",
+      "app_version": "5c268f3",
+      "chip": "esp32",
+      "flash_size_bytes": 4194304,
+      "ota_slot_size_bytes": 2031616,
+      "spi_routing_event_bytes": 144,
+      "wifi_peer_event_bytes": 132,
+      "source_archive_matches_worktree": true,
+      "hardware_validation_pending": true,
+      "flashed": false
+    },
+    "ramona": {
+      "built_utc": "2026-10-30T18:47:34.723508+00:00",
+      "variant": "ramona",
+      "ssid": "ComNetAR - Ramona",
+      "diagnostics": true,
+      "main_bin_sha256": "a8f4ac4dce34b2d2e1d59ab224cf4ca77bc16fc3e4fd0eea3f38b2324ea8bb55",
+      "size": 908016,
+      "elf_sha256_reported_by_firmware": "f4f8e9c6ad8b74219e3806d95ca0aea18f6ae054e877adcc6748259550005422",
+      "source_commit": "5c268f3f7ddb9cf2a6edb6a701f169204bcc56f4",
+      "app_version": "5c268f3",
+      "chip": "esp32",
+      "flash_size_bytes": 4194304,
+      "ota_slot_size_bytes": 2031616,
+      "spi_routing_event_bytes": 144,
+      "wifi_peer_event_bytes": 132,
+      "source_archive_matches_worktree": true,
+      "hardware_validation_pending": true,
+      "flashed": false
+    }
+  }
+}
